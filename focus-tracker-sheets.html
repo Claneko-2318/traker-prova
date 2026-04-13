@@ -232,7 +232,15 @@ const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400);}
 function setStatus(msg,type){const el=document.getElementById('config-status');el.textContent=msg;el.className='config-status '+type;}
-function fmt(dateStr){if(!dateStr)return'—';const s=dateStr.toString().slice(0,10);if(!s.includes('-'))return dateStr;const[y,m,d]=s.split('-');return d+'/'+m+'/'+y;}
+function fmt(dateStr){
+  if(!dateStr)return'—';
+  // prendi sempre solo i primi 10 caratteri (YYYY-MM-DD) ed evita new Date()
+  const s=String(dateStr).replace(/T.*$/,'').trim().slice(0,10);
+  if(!s.includes('-'))return s;
+  const p=s.split('-');
+  if(p.length!==3)return s;
+  return p[2]+'/'+p[1]+'/'+p[0];
+}
 function toHours(min){min=Number(min);const h=Math.floor(min/60),m=min%60;if(h>0&&m>0)return h+'h '+m+'min';if(h>0)return h+'h';return m+' min';}
 
 function getSelectedDate(){return document.getElementById('inp-date').value||todayStr;}
