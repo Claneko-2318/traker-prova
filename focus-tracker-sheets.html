@@ -15,13 +15,13 @@
   --icon-w:60px;--header-h:62px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+body{font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--text);min-height:100vh;}
 body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
 
 /* icon sidebar */
 .icon-sidebar{
-  position:fixed;left:0;top:0;bottom:0;width:var(--icon-w);
-  background:var(--surface);border-right:1px solid var(--border);
+  position:fixed;left:0.75rem;top:1rem;bottom:1rem;width:var(--icon-w);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
   display:flex;flex-direction:column;align-items:center;
   padding:0.75rem 0;z-index:50;gap:4px;
 }
@@ -42,8 +42,8 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 
 /* header */
 .topbar{
-  position:fixed;left:var(--icon-w);right:0;top:0;height:var(--header-h);
-  background:#fff;border-bottom:1px solid var(--border);
+  position:fixed;left:calc(var(--icon-w) + 1.5rem);right:1.5rem;top:1rem;height:var(--header-h);
+  background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);
   display:flex;align-items:center;padding:0 1.5rem;gap:1rem;z-index:40;
 }
 .topbar-avatar{
@@ -61,12 +61,19 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 
 /* main */
 .main{
-  margin-left:var(--icon-w);
-  padding-top:calc(var(--header-h) + 1.5rem);
-  padding-bottom:4rem;
-  padding-left:1.75rem;
-  padding-right:1.75rem;
-  max-width:1100px;
+  margin-left:calc(var(--icon-w) + 1.5rem);
+  padding-top:calc(var(--header-h) + 2.5rem);
+  padding-bottom:2rem;
+  padding-left:1.5rem;
+  padding-right:1.5rem;
+}
+.main-box{
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:2rem;
+  max-width:1060px;
+  margin:0 auto;
 }
 
 /* sezioni */
@@ -233,6 +240,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
 </div>
 
 <div class="main">
+<div class="main-box">
 
   <!-- PAGINA 1: Inserimento -->
   <!-- PAGINA 1: Inserimento -->
@@ -334,6 +342,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
   </div>
 
 </div>
+</div><!-- /main-box -->
 
 <!-- modal modifica -->
 <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal(event)">
