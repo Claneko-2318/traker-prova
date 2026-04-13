@@ -77,6 +77,7 @@
   .btn-primary { background: var(--brown); color: #FAF0E0; border-color: var(--brown); }
   .btn-primary:hover:not(:disabled) { background: var(--brown-dark); border-color: var(--brown-dark); }
   .btn-sm { font-size: 11px; padding: 4px 10px; border-radius: 6px; }
+  .btn-sm.active { background: var(--brown); color: #FAF0E0; border-color: var(--brown); }
   .btn-danger:hover { color: #8B1A1A; border-color: #8B1A1A; }
 
   .month-bar { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.75rem 1.25rem; margin-top: 1.5rem; }
@@ -110,6 +111,17 @@
 
   .chart-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-top: 1rem; }
   .chart-wrap { position: relative; width: 100%; height: 240px; }
+
+  /* modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(46,31,15,0.35); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .modal-overlay.hidden { display: none; }
+  .modal { background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--border); padding: 1.5rem; width: 100%; max-width: 480px; }
+  .modal h2 { font-family: 'Lora', serif; font-size: 1.1rem; font-weight: 500; color: var(--brown-dark); margin-bottom: 1.25rem; }
+  .modal-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-fields .field-full { grid-column: 1/-1; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 1.25rem; }
+  textarea { font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; color: var(--text); outline: none; transition: border-color 0.15s; width: 100%; resize: vertical; min-height: 70px; }
+  textarea:focus { border-color: var(--brown); }
 
   .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid var(--border2); border-top-color: var(--brown); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 5px; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -168,6 +180,10 @@
       <div class="field field-custom" id="field-custom-durata" style="display:none;"><label>minuti</label><input type="number" id="inp-durata-custom" min="1" max="120" placeholder="es. 30" oninput="updatePreview()" /></div>
       <div class="field-preview"><span class="preview-text" id="preview"></span></div>
     </div>
+    <div class="field" style="margin-top:10px;">
+      <label>note (opzionale)</label>
+      <textarea id="inp-note" placeholder="es. ho lavorato alla scena del capitolo 3, sistemato le commissioni di marzo…" style="min-height:55px;"></textarea>
+    </div>
     <div class="form-bottom"><button class="btn btn-primary" id="btn-add" onclick="addRow()">+ aggiungi sessione</button></div>
   </div>
 
@@ -206,9 +222,16 @@
 
   <div class="compare-row" id="compare-row"><span>—</span></div>
 
-  <div class="table-wrap">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1rem;margin-bottom:0.4rem;">
+    <div class="section-label" style="margin:0;flex:1;">sessioni registrate</div>
+    <div style="display:flex;gap:4px;margin-left:12px;">
+      <button class="btn btn-sm tbl-filter-btn active" data-limit="10" onclick="setTableLimit(10)">ultimi 10</button>
+      <button class="btn btn-sm tbl-filter-btn" data-limit="20" onclick="setTableLimit(20)">ultimi 20</button>
+      <button class="btn btn-sm tbl-filter-btn" data-limit="0" onclick="setTableLimit(0)">tutti</button>
+    </div>
+  </div>
     <table>
-      <thead><tr><th>Data</th><th>Categoria</th><th>Durata</th><th>Dettaglio</th><th>Umore</th><th></th></tr></thead>
+      <thead><tr><th>Data</th><th>Categoria</th><th>Durata</th><th>Dettaglio</th><th>Note</th><th>Umore</th><th></th></tr></thead>
       <tbody id="table-body"></tbody>
     </table>
   </div>
@@ -216,6 +239,51 @@
   <div class="chart-card">
     <div class="chart-wrap">
       <canvas id="myChart" role="img" aria-label="Grafico sessioni del mese">Nessun dato.</canvas>
+    </div>
+  </div>
+</div>
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>modifica sessione</h2>
+    <input type="hidden" id="modal-id" />
+    <div class="modal-fields">
+      <div class="field">
+        <label>data</label>
+        <input type="date" id="modal-date" />
+      </div>
+      <div class="field">
+        <label>categoria</label>
+        <select id="modal-cat"></select>
+      </div>
+      <div class="field">
+        <label>pomodori</label>
+        <input type="number" id="modal-pomodori" min="1" max="20" oninput="updateModalPreview()" />
+      </div>
+      <div class="field">
+        <label>durata pomodoro</label>
+        <select id="modal-durata" onchange="updateModalPreview()">
+          <option value="25">25 minuti</option>
+          <option value="35">35 minuti</option>
+          <option value="15">15 minuti</option>
+          <option value="50">50 minuti</option>
+          <option value="custom">personalizzata…</option>
+        </select>
+      </div>
+      <div class="field" id="modal-field-custom" style="display:none;">
+        <label>minuti personalizzati</label>
+        <input type="number" id="modal-durata-custom" min="1" max="120" oninput="updateModalPreview()" />
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end;padding-bottom:8px;">
+        <span style="font-size:12px;color:var(--text-muted);" id="modal-preview"></span>
+      </div>
+      <div class="field field-full">
+        <label>note</label>
+        <textarea id="modal-note" placeholder="es. ho lavorato alla scena del capitolo 3…"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">annulla</button>
+      <button class="btn btn-primary" onclick="saveEdit()">salva modifiche</button>
     </div>
   </div>
 </div>
@@ -286,10 +354,31 @@ function updateStats(filtered){
   else{const diff=totalMin-prevMin,pct=Math.abs(Math.round((diff/prevMin)*100));let arrow,cls,txt;if(diff>0){arrow='↑';cls='trend-up';txt=`+${pct}% rispetto a ${prevLbl} (${toHours(prevMin)})`;}else if(diff<0){arrow='↓';cls='trend-down';txt=`−${pct}% rispetto a ${prevLbl} (${toHours(prevMin)})`;}else{arrow='=';cls='trend-eq';txt=`uguale a ${prevLbl}`;}el.innerHTML=`<span class="compare-arrow ${cls}">${arrow}</span><span><strong>${toHours(totalMin)}</strong> questo mese — ${txt}</span>`;}
 }
 
+let tableLimit = 10;
+
+function setTableLimit(n){tableLimit=n;document.querySelectorAll('.tbl-filter-btn').forEach(b=>b.classList.toggle('active',Number(b.dataset.limit)===(n||0)));const f=getFiltered(viewYear,viewMonth);renderTable(f);}
+
 function renderTable(filtered){
   const tbody=document.getElementById('table-body');
-  if(filtered.length===0){tbody.innerHTML='<tr><td class="empty-cell" colspan="6">nessuna sessione in questo mese</td></tr>';return;}
-  tbody.innerHTML=[...filtered].reverse().map(s=>{const k=s.date.toString().slice(0,10);return`<tr><td>${fmt(s.date)}</td><td><span class="badge">${s.category||'—'}</span></td><td>${toHours(Number(s.minutes))}</td><td style="color:var(--text-muted);font-size:12px;">${s.pomodori?s.pomodori+' × '+s.durata_pomodoro+' min':'—'}</td><td style="font-size:18px;">${moods[k]||''}</td><td><button class="btn btn-sm btn-danger" onclick="removeRow('${s.id}')">rimuovi</button></td></tr>`;}).join('');
+  const reversed=[...filtered].reverse();
+  const shown=tableLimit>0?reversed.slice(0,tableLimit):reversed;
+  if(reversed.length===0){tbody.innerHTML='<tr><td class="empty-cell" colspan="7">nessuna sessione in questo mese</td></tr>';return;}
+  tbody.innerHTML=shown.map(s=>{
+    const k=s.date.toString().slice(0,10);
+    const noteSnippet=s.note?`<span style="display:block;font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;" title="${s.note.replace(/"/g,'&quot;')}">${s.note}</span>`:'';
+    return`<tr>
+      <td>${fmt(s.date)}</td>
+      <td><span class="badge">${s.category||'—'}</span></td>
+      <td>${toHours(Number(s.minutes))}</td>
+      <td style="color:var(--text-muted);font-size:12px;">${s.pomodori?s.pomodori+' × '+s.durata_pomodoro+' min':'—'}</td>
+      <td style="max-width:180px;">${noteSnippet}</td>
+      <td style="font-size:18px;">${moods[k]||''}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-sm" onclick="openModal('${s.id}')" style="margin-right:4px;">modifica</button>
+        <button class="btn btn-sm btn-danger" onclick="removeRow('${s.id}')">rimuovi</button>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 function renderChart(filtered){
@@ -297,10 +386,73 @@ function renderChart(filtered){
   const labels=Array.from({length:days},(_,i)=>String(i+1).padStart(2,'0'));
   const data=labels.map(d=>{const ds=getPrefix(viewYear,viewMonth)+'-'+d;return filtered.filter(s=>s.date.toString().slice(0,10)===ds).reduce((a,s)=>a+Number(s.minutes),0);});
   if(chart)chart.destroy();
-  chart=new Chart(document.getElementById('myChart'),{type:'line',data:{labels,datasets:[{label:'Minuti',data,borderColor:'#7A4E2D',backgroundColor:'rgba(122,78,45,0.07)',pointBackgroundColor:data.map(v=>v>0?'#4E2E14':'rgba(0,0,0,0)'),pointBorderColor:data.map(v=>v>0?'#fff':'rgba(0,0,0,0)'),pointBorderWidth:2,pointRadius:data.map(v=>v>0?5:2),pointHoverRadius:7,borderWidth:2,fill:true,tension:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#2E1F0F',titleColor:'#D9C4A0',bodyColor:'#FAF0E0',padding:10,callbacks:{title:ctx=>MESI[viewMonth]+' — giorno '+ctx[0].label,label:ctx=>{const ds=getPrefix(viewYear,viewMonth)+'-'+ctx.label;const mood=moods[ds];const txt=ctx.parsed.y>0?toHours(ctx.parsed.y):'nessuna sessione';return mood?' '+txt+'  '+mood:' '+txt;}}}},scales:{x:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#9C7A55',font:{size:11},autoSkip:true,maxTicksLimit:16}},y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#9C7A55',font:{size:11},callback:v=>v+' min'}}}}});
+  chart=new Chart(document.getElementById('myChart'),{type:'line',data:{labels,datasets:[{label:'Minuti',data,borderColor:'#7A4E2D',backgroundColor:'rgba(122,78,45,0.07)',pointBackgroundColor:data.map(v=>v>0?'#4E2E14':'rgba(0,0,0,0)'),pointBorderColor:data.map(v=>v>0?'#fff':'rgba(0,0,0,0)'),pointBorderWidth:2,pointRadius:data.map(v=>v>0?5:2),pointHoverRadius:7,borderWidth:2,fill:true,tension:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#2E1F0F',titleColor:'#D9C4A0',bodyColor:'#FAF0E0',padding:10,callbacks:{title:ctx=>MESI[viewMonth]+' — giorno '+ctx[0].label,label:ctx=>{
+    const ds=getPrefix(viewYear,viewMonth)+'-'+ctx.label;
+    const mood=moods[ds];
+    const daySessions=filtered.filter(s=>s.date.toString().slice(0,10)===ds);
+    if(ctx.parsed.y===0)return mood?' nessuna sessione  '+mood:' nessuna sessione';
+    const lines=[' '+toHours(ctx.parsed.y)+(mood?'  '+mood:'')];
+    const cats=[...new Set(daySessions.map(s=>s.category).filter(Boolean))];
+    if(cats.length)lines.push(' '+cats.join(', '));
+    return lines;
+  }}}},scales:{x:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#9C7A55',font:{size:11},autoSkip:true,maxTicksLimit:16}},y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)'},ticks:{color:'#9C7A55',font:{size:11},callback:v=>v+' min'}}}}});
 }
 
 function refresh(){const f=getFiltered(viewYear,viewMonth);updateStats(f);renderTable(f);renderChart(f);}
+
+// modal
+function openModal(id){
+  const s=sessions.find(x=>x.id.toString()===id.toString());
+  if(!s)return;
+  document.getElementById('modal-id').value=s.id;
+  document.getElementById('modal-date').value=s.date;
+  // popola select categorie
+  const sel=document.getElementById('modal-cat');
+  sel.innerHTML='<option value="">— scegli —</option>'+categories.map(c=>`<option value="${c}"${c===s.category?' selected':''}>${c}</option>`).join('');
+  document.getElementById('modal-pomodori').value=s.pomodori||'';
+  const durSel=document.getElementById('modal-durata');
+  const knownDurate=['25','35','15','50'];
+  const dur=s.durata_pomodoro?s.durata_pomodoro.toString():'25';
+  durSel.value=knownDurate.includes(dur)?dur:'custom';
+  document.getElementById('modal-durata-custom').value=knownDurate.includes(dur)?'':dur;
+  document.getElementById('modal-field-custom').style.display=knownDurate.includes(dur)?'none':'';
+  document.getElementById('modal-note').value=s.note||'';
+  updateModalPreview();
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeModal(e){if(!e||e.target===document.getElementById('modal-overlay'))document.getElementById('modal-overlay').classList.add('hidden');}
+function getModalDurata(){const sel=document.getElementById('modal-durata').value;return sel==='custom'?(parseInt(document.getElementById('modal-durata-custom').value)||0):parseInt(sel);}
+function updateModalPreview(){
+  document.getElementById('modal-field-custom').style.display=document.getElementById('modal-durata').value==='custom'?'':'none';
+  const n=parseInt(document.getElementById('modal-pomodori').value)||0;const d=getModalDurata();const tot=n*d;
+  document.getElementById('modal-preview').innerHTML=tot>0?`<strong>${tot} min</strong> (${n} × ${d})`:'';
+}
+async function saveEdit(){
+  const id=document.getElementById('modal-id').value;
+  const date=document.getElementById('modal-date').value;
+  const category=document.getElementById('modal-cat').value;
+  const pomodori=parseInt(document.getElementById('modal-pomodori').value);
+  const durata_pomodoro=getModalDurata();
+  const note=document.getElementById('modal-note').value.trim();
+  if(!date){toast('Inserisci la data.');return;}
+  if(!category){toast('Scegli una categoria.');return;}
+  if(!pomodori||pomodori<1){toast('Inserisci il numero di pomodori.');return;}
+  if(!durata_pomodoro){toast('Inserisci la durata.');return;}
+  const minutes=pomodori*durata_pomodoro;
+  // delete + add (Apps Script non ha update nativo)
+  const del=await api({action:'delete',id});
+  if(!del||!del.ok){toast('Errore durante la modifica.');return;}
+  const add=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note}});
+  if(add&&add.ok){
+    sessions=sessions.filter(s=>s.id.toString()!==id.toString());
+    sessions.push({id:add.id,date,category,minutes,pomodori,durata_pomodoro,note});
+    sessions.sort((a,b)=>a.date.localeCompare(b.date));
+    refresh();
+    document.getElementById('modal-overlay').classList.add('hidden');
+    toast('Sessione aggiornata!');
+    setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
+  }
+}
 
 async function api(params){
   if(!SCRIPT_URL){toast('Configura prima l\'URL!');return null;}
@@ -314,7 +466,6 @@ async function loadSessions(){
   const data=await api({action:'get'});
   if(data&&data.ok){
     sessions=(data.sessions||[]).map(s=>{
-      // normalizza date da Sheets che arrivano come oggetti Date serializzati
       let d=s.date?s.date.toString():'';
       if(d.length>10){const dt=new Date(d);if(!isNaN(dt))d=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');}
       return{...s,date:d};
@@ -326,13 +477,14 @@ async function loadSessions(){
 async function addRow(){
   const date=document.getElementById('inp-date').value,category=document.getElementById('inp-cat').value;
   const pomodori=parseInt(document.getElementById('inp-pomodori').value),durata_pomodoro=getDurata();
+  const note=document.getElementById('inp-note').value.trim();
   if(!date){toast('Inserisci la data.');return;}if(!category){toast('Scegli una categoria.');return;}
   if(!pomodori||pomodori<1){toast('Inserisci il numero di pomodori.');return;}if(!durata_pomodoro){toast('Inserisci la durata.');return;}
   const minutes=pomodori*durata_pomodoro;
   const btn=document.getElementById('btn-add');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>salvataggio…';
-  const data=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro}});
+  const data=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note}});
   btn.disabled=false;btn.textContent='+ aggiungi sessione';
-  if(data&&data.ok){sessions.push({id:data.id,date,category,minutes,pomodori,durata_pomodoro});sessions.sort((a,b)=>a.date.toString().localeCompare(b.date.toString()));refresh();document.getElementById('inp-pomodori').value='';document.getElementById('inp-durata-custom').value='';document.getElementById('preview').innerHTML='';toast('Sessione salvata!');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');}
+  if(data&&data.ok){sessions.push({id:data.id,date,category,minutes,pomodori,durata_pomodoro,note});sessions.sort((a,b)=>a.date.localeCompare(b.date));refresh();document.getElementById('inp-pomodori').value='';document.getElementById('inp-durata-custom').value='';document.getElementById('inp-note').value='';document.getElementById('preview').innerHTML='';toast('Sessione salvata!');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');}
 }
 
 async function removeRow(id){
