@@ -155,14 +155,24 @@
     <p>sessioni pomodoro — salvate su Google Sheets</p>
   </header>
 
-  <div class="section-label">connessione a google sheets</div>
-  <div class="card config-box">
-    <p>Incolla qui l'URL della tua Web App. Viene salvato automaticamente nel browser.</p>
-    <div class="config-row">
-      <input type="text" id="script-url" placeholder="https://script.google.com/macros/s/…/exec" />
-      <button class="btn btn-primary" onclick="saveScriptUrl()">salva e collega</button>
+  <div id="config-collapsed" class="config-collapsed" style="display:none;">
+    <div class="config-collapsed-left">
+      <div class="config-collapsed-dot"></div>
+      <span>Connessa a Google Sheets</span>
     </div>
-    <div class="config-status wait" id="config-status">In attesa dell'URL…</div>
+    <button class="btn btn-sm" onclick="openConfig()">modifica</button>
+  </div>
+
+  <div id="config-open">
+    <div class="section-label">connessione a google sheets</div>
+    <div class="card config-box">
+      <p>Incolla qui l'URL della tua Web App. Viene salvato automaticamente nel browser.</p>
+      <div class="config-row">
+        <input type="text" id="script-url" placeholder="https://script.google.com/macros/s/…/exec" />
+        <button class="btn btn-primary" onclick="saveScriptUrl()">salva e collega</button>
+      </div>
+      <div class="config-status wait" id="config-status">In attesa dell'URL…</div>
+    </div>
   </div>
 
   <div class="section-label">categorie</div>
@@ -177,7 +187,7 @@
   <div class="section-label">nuova sessione</div>
   <div class="card">
     <div class="form-fields">
-      <div class="field field-date"><label>data</label><input type="date" id="inp-date" /></div>
+      <div class="field field-date"><label>data</label><input type="date" id="inp-date" onchange="renderMoodUI()" /></div>
       <div class="field field-cat"><label>categoria</label>
         <select id="inp-cat"><option value="">— scegli —</option></select>
       </div>
@@ -199,10 +209,10 @@
     </div>
   </div>
 
-  <div class="section-label">umore di oggi</div>
+  <div class="section-label">umore del giorno selezionato</div>
   <div class="card">
     <div class="mood-row">
-      <span class="mood-date-label">com'è andata oggi?</span>
+      <span class="mood-date-label" id="mood-date-label">com'è andata?</span>
       <div class="mood-btns">
         <button class="mood-btn" data-mood="😴" onclick="setMood('😴')" title="stanca / senza energia">😴</button>
         <button class="mood-btn" data-mood="😐" onclick="setMood('😐')" title="nella media">😐</button>
@@ -284,7 +294,7 @@ const now = new Date();
 let viewYear  = now.getFullYear();
 let viewMonth = now.getMonth();
 const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
-const todayStr = now.toISOString().slice(0,10);
+const todayStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
 
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -310,18 +320,25 @@ function toHours(min) {
 }
 
 // --- mood ---
+function getSelectedDate() {
+  return document.getElementById('inp-date').value || todayStr;
+}
 function setMood(emoji) {
-  moods[todayStr] = emoji;
+  const dateKey = getSelectedDate();
+  moods[dateKey] = emoji;
   localStorage.setItem('focus_moods', JSON.stringify(moods));
   renderMoodUI();
-  toast('Umore salvato!');
+  toast('Umore salvato per il ' + fmt(dateKey) + '!');
 }
 function renderMoodUI() {
-  const saved = moods[todayStr];
+  const dateKey = getSelectedDate();
+  const saved = moods[dateKey];
   document.querySelectorAll('.mood-btn').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.mood === saved);
   });
-  document.getElementById('mood-saved').textContent = saved ? 'salvato per oggi' : '';
+  const label = dateKey === todayStr ? 'com\'è andata oggi?' : 'com\'è andata il ' + fmt(dateKey) + '?';
+  document.getElementById('mood-date-label').textContent = label;
+  document.getElementById('mood-saved').textContent = saved ? 'salvato' : '';
 }
 
 // --- categorie ---
@@ -401,10 +418,14 @@ function updateStats(filtered) {
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-time').textContent  = total>0 ? toHours(totalMin) : '—';
 
-  // media per giorni attivi
-  const weeksInMonth = new Date(viewYear, viewMonth+1, 0).getDate() / 7;
-  const avg = weeksInMonth>0 ? Math.round(totalMin/weeksInMonth) : 0;
-  document.getElementById('stat-avg').textContent = avg>0 ? avg+' min' : '—';
+  // media settimanale — conta solo settimane con almeno una sessione
+  const weekNums = new Set(filtered.map(s => {
+    const d = new Date(s.date.toString().slice(0,10)+'T12:00:00');
+    return Math.ceil(d.getDate() / 7);
+  }));
+  const activeWeeks = weekNums.size;
+  const avg = activeWeeks>0 ? Math.round(totalMin/activeWeeks) : 0;
+  document.getElementById('stat-avg').textContent = avg>0 ? toHours(avg) : '—';
 
   // giorno top
   const byDay = {};
@@ -551,6 +572,7 @@ async function loadSessions() {
     sessions = (data.sessions||[]).sort((a,b)=>a.date.toString().localeCompare(b.date.toString()));
     refresh();
     setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
+    collapseConfig();
   } else if (data) {
     setStatus('Errore: '+(data.error||'risposta non valida'),'err');
   }
@@ -595,6 +617,14 @@ async function removeRow(id) {
   }
 }
 
+function collapseConfig() {
+  document.getElementById('config-open').style.display = 'none';
+  document.getElementById('config-collapsed').style.display = 'flex';
+}
+function openConfig() {
+  document.getElementById('config-open').style.display = 'block';
+  document.getElementById('config-collapsed').style.display = 'none';
+}
 function saveScriptUrl() {
   const val = document.getElementById('script-url').value.trim();
   if (!val.startsWith('https://script.google.com')) { toast('URL non valido.'); return; }
@@ -627,9 +657,11 @@ refresh();
 
 if (SCRIPT_URL) {
   document.getElementById('script-url').value = SCRIPT_URL;
+  collapseConfig();
   loadSessions();
 } else {
   setStatus('Inserisci l\'URL della Web App per collegarti','wait');
+  openConfig();
 }
 </script>
 </body>
