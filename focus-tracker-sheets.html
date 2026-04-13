@@ -822,7 +822,7 @@ function exportPDF(){
     const moodText={'😴':'stanca','😐':'media','🙂':'bene','⚡':'top'}[s.mood]||s.mood||'—';
     doc.text(moodText, cols[5], y);
     y+=rowH;
-    doc.setDrawColor(232,217,192);doc.line(14,y-2,196,y-2);
+    doc.setDrawColor(232,217,192);doc.line(14,y-1,196,y-1);
   });
 
   // footer
