@@ -321,20 +321,18 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
           <div class="field" style="margin-top:10px;"><label>note (opzionale)</label>
             <textarea id="inp-note" placeholder="es. scena del capitolo 3, commissioni di marzo…"></textarea>
           </div>
+          <div class="field" style="margin-top:10px;">
+            <label>umore</label>
+            <div class="mood-btns" style="margin-top:4px;">
+              <button type="button" class="mood-btn" data-mood="😴" onclick="selectFormMood(this)" title="stanca">😴</button>
+              <button type="button" class="mood-btn" data-mood="😐" onclick="selectFormMood(this)" title="nella media">😐</button>
+              <button type="button" class="mood-btn" data-mood="🙂" onclick="selectFormMood(this)" title="bene">🙂</button>
+              <button type="button" class="mood-btn" data-mood="⚡" onclick="selectFormMood(this)" title="super produttiva">⚡</button>
+            </div>
+          </div>
           <div class="form-bottom"><button class="btn btn-primary" id="btn-add" onclick="addRow()">+ aggiungi sessione</button></div>
         </div>
-        <div class="card">
-          <div class="mood-row">
-            <span class="mood-date-label" id="mood-date-label">com&#39;&#232; andata?</span>
-            <div class="mood-btns">
-              <button class="mood-btn" data-mood="😴" onclick="setMood('😴')" title="stanca">😴</button>
-              <button class="mood-btn" data-mood="😐" onclick="setMood('😐')" title="nella media">😐</button>
-              <button class="mood-btn" data-mood="🙂" onclick="setMood('🙂')" title="bene">🙂</button>
-              <button class="mood-btn" data-mood="⚡" onclick="setMood('⚡')" title="super produttiva">⚡</button>
-            </div>
-            <span class="mood-saved" id="mood-saved"></span>
-          </div>
-        </div>
+
       </div>
     </div>
   </div>
@@ -402,6 +400,15 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
       <div class="field" id="modal-field-custom" style="display:none;"><label>minuti personalizzati</label><input type="number" id="modal-durata-custom" min="1" max="120" oninput="updateModalPreview()"/></div>
       <div class="field" style="display:flex;align-items:flex-end;padding-bottom:8px;"><span style="font-size:12px;color:var(--text-muted);" id="modal-preview"></span></div>
       <div class="field field-full"><label>note</label><textarea id="modal-note" placeholder="es. ho lavorato alla scena del capitolo 3…"></textarea></div>
+      <div class="field field-full">
+        <label>umore</label>
+        <div class="mood-btns" style="margin-top:4px;">
+          <button type="button" class="modal-mood-btn mood-btn" data-mood="😴" onclick="selectModalMood(this)">😴</button>
+          <button type="button" class="modal-mood-btn mood-btn" data-mood="😐" onclick="selectModalMood(this)">😐</button>
+          <button type="button" class="modal-mood-btn mood-btn" data-mood="🙂" onclick="selectModalMood(this)">🙂</button>
+          <button type="button" class="modal-mood-btn mood-btn" data-mood="⚡" onclick="selectModalMood(this)">⚡</button>
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal()">annulla</button>
@@ -458,7 +465,7 @@ function setMood(emoji){
   if(SCRIPT_URL) api({action:'saveMood',date:k,emoji}).then(()=>toast('Umore salvato per il '+fmt(k)+'!')).catch(()=>toast('Umore salvato per il '+fmt(k)+'!'));
   else toast('Umore salvato per il '+fmt(k)+'!');
 }
-function renderMoodUI(){const k=getSelectedDate();const saved=moods[k];document.querySelectorAll('.mood-btn').forEach(b=>b.classList.toggle('selected',b.dataset.mood===saved));const lbl=k===todayStr?"com'\u00e8 andata oggi?":"com'\u00e8 andata il "+fmt(k)+"?";document.getElementById('mood-date-label').textContent=lbl;document.getElementById('mood-saved').textContent=saved?'salvato':"";}
+function renderMoodUI(){}
 
 function selectCatColor(el){
   selectedCatColor=el.dataset.color;
@@ -545,7 +552,7 @@ function renderTable(filtered){
       <td>${toHours(Number(s.minutes))}</td>
       <td style="color:var(--text-muted);font-size:12px;">${s.pomodori?s.pomodori+' × '+s.durata_pomodoro+' min':'—'}</td>
       <td style="max-width:160px;">${noteSnippet||'<span style="color:var(--text-muted)">—</span>'}</td>
-      <td style="font-size:18px;">${moods[k]||''}</td>
+      <td style="font-size:18px;">${s.mood||moods[k]||''}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-sm" onclick="openModal('${s.id}')" style="margin-right:4px;">modifica</button>
         <button class="btn btn-sm btn-danger" onclick="removeRow('${s.id}')">rimuovi</button>
@@ -602,6 +609,7 @@ function openModal(id){
   document.getElementById('modal-durata-custom').value=knownDurate.includes(dur)?'':dur;
   document.getElementById('modal-field-custom').style.display=knownDurate.includes(dur)?'none':'';
   document.getElementById('modal-note').value=s.note||'';
+  document.querySelectorAll('.modal-mood-btn').forEach(b=>b.classList.toggle('selected',b.dataset.mood===s.mood));
   updateModalPreview();
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
@@ -611,6 +619,8 @@ function updateModalPreview(){
   document.getElementById('modal-field-custom').style.display=document.getElementById('modal-durata').value==='custom'?'':'none';
   const n=parseInt(document.getElementById('modal-pomodori').value)||0;const d=getModalDurata();const tot=n*d;
   document.getElementById('modal-preview').innerHTML=tot>0?`<strong>${tot} min</strong> (${n} × ${d})`:'';}
+function selectModalMood(el){document.querySelectorAll('.modal-mood-btn').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');}
+function getModalMood(){const sel=document.querySelector('.modal-mood-btn.selected');return sel?sel.dataset.mood:'';}
 async function saveEdit(){
   const id=document.getElementById('modal-id').value;
   const date=document.getElementById('modal-date').value;
@@ -622,10 +632,11 @@ async function saveEdit(){
   const minutes=pomodori*durata_pomodoro;
   const del=await api({action:'delete',id});
   if(!del||!del.ok){toast('Errore durante la modifica.');return;}
-  const add=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note}});
+  const mood=getModalMood();
+  const add=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood}});
   if(add&&add.ok){
     sessions=sessions.filter(s=>s.id.toString()!==id.toString());
-    sessions.push({id:add.id,date,category,minutes,pomodori,durata_pomodoro,note});
+    sessions.push({id:add.id,date,category,minutes,pomodori,durata_pomodoro,note,mood});
     sessions.sort((a,b)=>a.date.localeCompare(b.date));
     refresh();document.getElementById('modal-overlay').classList.add('hidden');
     toast('Sessione aggiornata!');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
@@ -693,24 +704,36 @@ async function loadSessions(){
   }else if(data){setStatus('Errore: '+(data.error||'risposta non valida'),'err');}
 }
 
+function selectFormMood(el){
+  document.querySelectorAll('.mood-btn[data-mood]').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function getFormMood(){
+  const sel=document.querySelector('.mood-btn.selected');
+  return sel?sel.dataset.mood:'';
+}
+
 async function addRow(){
   const date=document.getElementById('inp-date').value,category=document.getElementById('inp-cat').value;
   const pomodori=parseInt(document.getElementById('inp-pomodori').value),durata_pomodoro=getDurata();
   const note=document.getElementById('inp-note').value.trim();
+  const mood=getFormMood();
   if(!date){toast('Inserisci la data.');return;}if(!category){toast('Scegli una categoria.');return;}
   if(!pomodori||pomodori<1){toast('Inserisci il numero di pomodori.');return;}if(!durata_pomodoro){toast('Inserisci la durata.');return;}
+  if(!mood){toast('Seleziona il tuo umore!');return;}
   const minutes=pomodori*durata_pomodoro;
   const btn=document.getElementById('btn-add');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>salvataggio…';
-  const data=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note}});
+  const data=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood}});
   btn.disabled=false;btn.textContent='+ aggiungi sessione';
   if(data&&data.ok){
-    sessions.push({id:data.id,date,category,minutes,pomodori,durata_pomodoro,note});
+    sessions.push({id:data.id,date,category,minutes,pomodori,durata_pomodoro,note,mood});
     sessions.sort((a,b)=>a.date.localeCompare(b.date));
     refresh();
     document.getElementById('inp-pomodori').value='';
     document.getElementById('inp-durata-custom').value='';
     document.getElementById('inp-note').value='';
     document.getElementById('preview').innerHTML='';
+    document.querySelectorAll('.mood-btn[data-mood]').forEach(b=>b.classList.remove('selected'));
     toast('Sessione salvata!');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
   }
 }
