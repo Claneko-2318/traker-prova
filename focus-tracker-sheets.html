@@ -44,6 +44,11 @@
   .config-status.ok   { background: #D6EDE2; color: #224D38; }
   .config-status.err  { background: #F5E0D6; color: #6B1A0A; }
   .config-status.wait { background: var(--surface); color: var(--text-muted); }
+  .config-collapsed { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.7rem 1.25rem; }
+  .config-collapsed-left { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-mid); }
+  .config-collapsed-dot { width: 8px; height: 8px; border-radius: 50%; background: #3D7A5A; flex-shrink: 0; }
+  .config-inner { display: none; }
+  .config-inner.open { display: block; }
 
   /* categorie */
   .cat-add-row { display: flex; gap: 8px; margin-bottom: 0.75rem; }
