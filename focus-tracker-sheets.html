@@ -86,14 +86,14 @@
   .month-nav button:hover { background: var(--surface); }
   .month-label { font-family: 'Lora', serif; font-size: 1.2rem; color: var(--brown-dark); min-width: 170px; text-align: center; }
 
-  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 1.1rem; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 1.5rem; }
   @media(max-width:700px){.stats-grid{grid-template-columns:1fr 1fr;}}
   .stat-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.25rem; }
   .stat-label { font-size: 11px; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 7px; }
   .stat-value { font-family: 'Lora', serif; font-size: 1.7rem; color: var(--brown-dark); font-weight: 500; line-height: 1.1; }
   .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
 
-  .compare-row { display: flex; align-items: center; gap: 10px; margin-top: 1.1rem; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.5rem; font-size: 14px; color: var(--text-mid); flex-wrap: wrap; }
+  .compare-row { display: flex; align-items: center; gap: 10px; margin-top: 1.25rem; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.5rem; font-size: 14px; color: var(--text-mid); flex-wrap: wrap; }
   .compare-row strong { color: var(--brown-dark); }
   .compare-arrow { font-size: 20px; }
   .trend-up{color:#3D7A5A;} .trend-down{color:#8B3A2A;} .trend-eq{color:var(--text-muted);}
@@ -109,9 +109,11 @@
   .empty-cell { text-align: center; color: var(--text-muted); font-style: italic; padding: 2rem !important; font-size: 14px; }
   .badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 99px; background: var(--surface2); color: var(--brown-dark); }
 
-  .chart-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-top: 1rem; }
+  .chart-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-top: 2rem; }
   .chart-wrap { position: relative; width: 100%; height: 260px; overflow: hidden; }
   .chart-wrap canvas { display: block; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+  @media(max-width:700px){ .two-col { grid-template-columns: 1fr; } }
 
   /* modal */
   .modal-overlay { position: fixed; inset: 0; background: rgba(46,31,15,0.35); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -156,36 +158,39 @@
     </div>
   </div>
 
-  <div class="section-label">categorie</div>
-  <div class="card">
-    <div class="cat-add-row">
-      <input type="text" id="inp-new-cat" placeholder="es. streaming, commissioni, D&amp;D prep…" onkeydown="if(event.key==='Enter') addCategory()" />
-      <button class="btn btn-primary" onclick="addCategory()">+ aggiungi</button>
-    </div>
-    <div class="cat-chips" id="cat-chips"><span class="cat-empty">nessuna categoria ancora</span></div>
-  </div>
-
-  <div class="section-label">nuova sessione</div>
-  <div class="card">
-    <div class="form-fields">
-      <div class="field field-date"><label>data</label><input type="date" id="inp-date" onchange="renderMoodUI()" /></div>
-      <div class="field field-cat"><label>categoria</label><select id="inp-cat"><option value="">— scegli —</option></select></div>
-      <div class="field field-pom"><label>pomodori</label><input type="number" id="inp-pomodori" min="1" max="20" placeholder="es. 4" oninput="updatePreview()" /></div>
-      <div class="field field-dur"><label>durata pomodoro</label>
-        <select id="inp-durata" onchange="onDurataChange()">
-          <option value="25">25 minuti</option><option value="35">35 minuti</option>
-          <option value="15">15 minuti</option><option value="50">50 minuti</option>
-          <option value="custom">personalizzata…</option>
-        </select>
+  <div class="section-label" style="margin-top:2rem;">categorie &amp; nuova sessione</div>
+  <div class="two-col">
+    <div class="card">
+      <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.9rem;">categorie</div>
+      <div class="cat-add-row">
+        <input type="text" id="inp-new-cat" placeholder="es. streaming, commissioni…" onkeydown="if(event.key==='Enter') addCategory()" />
+        <button class="btn btn-primary" onclick="addCategory()">+ aggiungi</button>
       </div>
-      <div class="field field-custom" id="field-custom-durata" style="display:none;"><label>minuti</label><input type="number" id="inp-durata-custom" min="1" max="120" placeholder="es. 30" oninput="updatePreview()" /></div>
-      <div class="field-preview"><span class="preview-text" id="preview"></span></div>
+      <div class="cat-chips" id="cat-chips"><span class="cat-empty">nessuna categoria ancora</span></div>
     </div>
-    <div class="field" style="margin-top:10px;">
-      <label>note (opzionale)</label>
-      <textarea id="inp-note" placeholder="es. ho lavorato alla scena del capitolo 3, sistemato le commissioni di marzo…" style="min-height:55px;"></textarea>
+
+    <div class="card">
+      <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.9rem;">nuova sessione</div>
+      <div class="form-fields">
+        <div class="field field-date"><label>data</label><input type="date" id="inp-date" onchange="renderMoodUI()" /></div>
+        <div class="field field-cat"><label>categoria</label><select id="inp-cat"><option value="">— scegli —</option></select></div>
+        <div class="field field-pom"><label>pomodori</label><input type="number" id="inp-pomodori" min="1" max="20" placeholder="es. 4" oninput="updatePreview()" /></div>
+        <div class="field field-dur"><label>durata pomodoro</label>
+          <select id="inp-durata" onchange="onDurataChange()">
+            <option value="25">25 minuti</option><option value="35">35 minuti</option>
+            <option value="15">15 minuti</option><option value="50">50 minuti</option>
+            <option value="custom">personalizzata…</option>
+          </select>
+        </div>
+        <div class="field field-custom" id="field-custom-durata" style="display:none;"><label>minuti</label><input type="number" id="inp-durata-custom" min="1" max="120" placeholder="es. 30" oninput="updatePreview()" /></div>
+        <div class="field-preview"><span class="preview-text" id="preview"></span></div>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>note (opzionale)</label>
+        <textarea id="inp-note" placeholder="es. ho lavorato alla scena del capitolo 3…" style="min-height:58px;"></textarea>
+      </div>
+      <div class="form-bottom"><button class="btn btn-primary" id="btn-add" onclick="addRow()">+ aggiungi sessione</button></div>
     </div>
-    <div class="form-bottom"><button class="btn btn-primary" id="btn-add" onclick="addRow()">+ aggiungi sessione</button></div>
   </div>
 
   <div class="section-label">umore del giorno selezionato</div>
@@ -223,7 +228,7 @@
 
   <div class="compare-row" id="compare-row"><span>—</span></div>
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1rem;margin-bottom:0.4rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2rem;margin-bottom:0.6rem;">
     <div class="section-label" style="margin:0;flex:1;">sessioni registrate</div>
     <div style="display:flex;gap:4px;margin-left:12px;">
       <button class="btn btn-sm tbl-filter-btn active" data-limit="10" onclick="setTableLimit(10)">ultimi 10</button>
@@ -473,7 +478,15 @@ async function loadSessions(){
   if(data&&data.ok){
     sessions=(data.sessions||[]).map(s=>{
       let d=s.date?s.date.toString():'';
-      if(d.length>10){const dt=new Date(d);if(!isNaN(dt))d=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');}
+      // Sheets restituisce date come "Sun Apr 13 2026 00:00:00 GMT+0200" o ISO string
+      // Usiamo sempre UTC per evitare shift di fuso
+      if(d.length>10){
+        const dt=new Date(d);
+        if(!isNaN(dt.getTime()))
+          d=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
+        else
+          d=d.slice(0,10);
+      }
       return{...s,date:d};
     }).sort((a,b)=>a.date.localeCompare(b.date));
     refresh();setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');collapseConfig();
@@ -503,7 +516,125 @@ function openConfig(){document.getElementById('config-open').style.display='bloc
 function saveScriptUrl(){const val=document.getElementById('script-url').value.trim();if(!val.startsWith('https://script.google.com')){toast('URL non valido.');return;}SCRIPT_URL=val;localStorage.setItem('focus_script_url',val);loadSessions();}
 
 function exportPNG(){if(!chart){toast('Nessun grafico.');return;}const a=document.createElement('a');a.href=chart.canvas.toDataURL('image/png');a.download='focus-tracker.png';a.click();}
-function exportPDF(){if(!chart){toast('Nessun grafico.');return;}const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});doc.setFillColor(250,246,238);doc.rect(0,0,297,210,'F');doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(78,46,20);doc.text('Focus Tracker',14,18);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(156,122,85);doc.text(MESI[viewMonth]+' '+viewYear,14,25);doc.addImage(chart.canvas.toDataURL('image/png'),'PNG',14,32,268,130);doc.setFontSize(8);doc.text('Esportato il '+new Date().toLocaleDateString('it-IT'),14,200);doc.save('focus-'+viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'.pdf');}
+
+function exportPDF(){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const filtered=getFiltered(viewYear,viewMonth);
+  const totalMin=filtered.reduce((a,s)=>a+Number(s.minutes),0);
+  const mLabel=MESI[viewMonth]+' '+viewYear;
+
+  // sfondo crema
+  doc.setFillColor(250,246,238);
+  doc.rect(0,0,210,297,'F');
+
+  // titolo
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(22);
+  doc.setTextColor(78,46,20);
+  doc.text('Focus Tracker',14,20);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(11);
+  doc.setTextColor(156,122,85);
+  doc.text(mLabel,14,28);
+
+  // linea separatrice
+  doc.setDrawColor(217,196,160);
+  doc.setLineWidth(0.3);
+  doc.line(14,32,196,32);
+
+  // statistiche
+  let y=40;
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.setTextColor(156,122,85);
+  doc.text('RIEPILOGO',14,y);
+  y+=6;
+
+  const stats=[
+    ['Sessioni totali', filtered.length.toString()],
+    ['Tempo totale', toHoursStr(totalMin)],
+    ['Media settimanale', (()=>{const today=new Date(todayStr+'T12:00:00');const isCurr=(viewYear===today.getFullYear()&&viewMonth===today.getMonth());const lastDay=isCurr?today.getDate():new Date(viewYear,viewMonth+1,0).getDate();const wk=Math.ceil(lastDay/7);return wk>0?toHoursStr(Math.round(totalMin/wk)):'—';})()],
+    ['Streak attuale', calcStreak()+' giorni'],
+    ['Giorno top', (()=>{const bd={};filtered.forEach(s=>{const d=s.date.toString().slice(0,10);bd[d]=(bd[d]||0)+Number(s.minutes);});const t=Object.entries(bd).sort((a,b)=>b[1]-a[1])[0];return t?fmt(t[0])+' ('+toHoursStr(t[1])+')':'—';})()],
+  ];
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  stats.forEach(([label,val])=>{
+    doc.setTextColor(156,122,85); doc.text(label,14,y);
+    doc.setTextColor(78,46,20); doc.text(val,80,y);
+    y+=6;
+  });
+
+  y+=4;
+  doc.setDrawColor(217,196,160);
+  doc.line(14,y,196,y);
+  y+=8;
+
+  // grafico
+  if(chart){
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.setTextColor(156,122,85);
+    doc.text('ANDAMENTO NEL TEMPO',14,y);
+    y+=5;
+    doc.addImage(chart.canvas.toDataURL('image/png'),'PNG',14,y,182,70);
+    y+=76;
+  }
+
+  doc.setDrawColor(217,196,160);
+  doc.line(14,y,196,y);
+  y+=8;
+
+  // tabella sessioni
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.setTextColor(156,122,85);
+  doc.text('SESSIONI DEL MESE',14,y);
+  y+=6;
+
+  // intestazioni tabella
+  const cols=[14,38,62,86,116,155];
+  const headers=['Data','Categoria','Durata','Dettaglio','Note','Umore'];
+  doc.setFontSize(8);
+  doc.setTextColor(156,122,85);
+  headers.forEach((h,i)=>doc.text(h,cols[i],y));
+  y+=2;
+  doc.setDrawColor(217,196,160);
+  doc.line(14,y,196,y);
+  y+=4;
+
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(46,31,15);
+  const rowH=5.5;
+  [...filtered].reverse().forEach(s=>{
+    if(y>272){doc.addPage();doc.setFillColor(250,246,238);doc.rect(0,0,210,297,'F');y=15;}
+    const k=s.date.toString().slice(0,10);
+    const det=s.pomodori?s.pomodori+'×'+s.durata_pomodoro:'—';
+    const note=s.note?(s.note.length>22?s.note.slice(0,22)+'…':s.note):'—';
+    const mood=moods[k]||'';
+    doc.setFontSize(8);
+    doc.text(fmt(s.date),cols[0],y);
+    doc.text((s.category||'—').slice(0,14),cols[1],y);
+    doc.text(toHoursStr(Number(s.minutes)),cols[2],y);
+    doc.text(det,cols[3],y);
+    doc.text(note,cols[4],y);
+    doc.text(mood,cols[5],y);
+    y+=rowH;
+    doc.setDrawColor(232,217,192);
+    doc.line(14,y-1,196,y-1);
+  });
+
+  // footer
+  doc.setFontSize(7);
+  doc.setTextColor(156,122,85);
+  doc.text('Esportato il '+new Date().toLocaleDateString('it-IT')+' · Focus Tracker',14,289);
+
+  doc.save('focus-'+viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'.pdf');
+}
+
+function toHoursStr(min){min=Number(min);const h=Math.floor(min/60),m=min%60;if(h>0&&m>0)return h+'h '+m+'min';if(h>0)return h+'h';return m+' min';}
 
 document.getElementById('inp-date').value=todayStr;
 renderCategories();renderMoodUI();refresh();
