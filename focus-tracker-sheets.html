@@ -676,8 +676,9 @@ async function loadSessions(){
       const rawMoods=data.moods||{};
       moods={};
       Object.keys(rawMoods).forEach(k=>{
-        const norm=normalizeDate(k);
-        if(norm) moods[norm]=rawMoods[k];
+        // le chiavi dell'umore da Sheets sono già YYYY-MM-DD, non usare new Date()
+        const norm=k?k.toString().slice(0,10):'';
+        if(norm&&norm.includes('-')) moods[norm]=rawMoods[k];
       });
       localStorage.setItem('focus_moods',JSON.stringify(moods));
     } else {
