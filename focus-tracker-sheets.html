@@ -305,7 +305,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
         <div class="card">
           <div class="card-title">nuova sessione</div>
           <div class="form-fields">
-            <div class="field field-date"><label>data</label><input type="date" id="inp-date" onchange="renderMoodUI()"/></div>
+            <div class="field field-date"><label>data</label><input type="date" id="inp-date"/></div>
             <div class="field field-cat"><label>categoria</label><select id="inp-cat"><option value="">— scegli —</option></select></div>
             <div class="field field-pom"><label>pomodori</label><input type="number" id="inp-pomodori" min="1" max="20" placeholder="es. 4" oninput="updatePreview()"/></div>
             <div class="field field-dur"><label>durata</label>
@@ -419,7 +419,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
 <div id="toast"></div>
 
 <script>
-let sessions=[],moods={},chart=null;
+let sessions=[],chart=null;
 let selectedCatColor='#EAD9C0';
 let SCRIPT_URL=localStorage.getItem('focus_script_url')||'';
 let categories=[];
@@ -456,15 +456,7 @@ function fmt(dateStr){
 function toHours(min){min=Number(min);const h=Math.floor(min/60),m=min%60;if(h>0&&m>0)return h+'h '+m+'min';if(h>0)return h+'h';return m+' min';}
 
 function getSelectedDate(){return document.getElementById('inp-date').value||todayStr;}
-function setMood(emoji){
-  const k=getSelectedDate();
-  moods[k]=emoji;
-  localStorage.setItem('focus_moods',JSON.stringify(moods));
-  renderMoodUI();
-  refresh();
-  if(SCRIPT_URL) api({action:'saveMood',date:k,emoji}).then(()=>toast('Umore salvato per il '+fmt(k)+'!')).catch(()=>toast('Umore salvato per il '+fmt(k)+'!'));
-  else toast('Umore salvato per il '+fmt(k)+'!');
-}
+
 function renderMoodUI(){}
 
 function selectCatColor(el){
@@ -552,7 +544,7 @@ function renderTable(filtered){
       <td>${toHours(Number(s.minutes))}</td>
       <td style="color:var(--text-muted);font-size:12px;">${s.pomodori?s.pomodori+' × '+s.durata_pomodoro+' min':'—'}</td>
       <td style="max-width:160px;">${noteSnippet||'<span style="color:var(--text-muted)">—</span>'}</td>
-      <td style="font-size:18px;">${s.mood||moods[k]||''}</td>
+      <td style="font-size:18px;">${s.mood||''}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-sm" onclick="openModal('${s.id}')" style="margin-right:4px;">modifica</button>
         <button class="btn btn-sm btn-danger" onclick="removeRow('${s.id}')">rimuovi</button>
@@ -577,8 +569,9 @@ function renderChart(filtered){
         title:ctx=>MESI[viewMonth]+' — giorno '+ctx[0].label,
         label:ctx=>{
           const ds=getPrefix(viewYear,viewMonth)+'-'+ctx.label;
-          const mood=moods[ds];
-          const cats=[...new Set(filtered.filter(s=>s.date===ds).map(s=>s.category).filter(Boolean))];
+          const daySessions=filtered.filter(s=>s.date===ds);
+          const mood=daySessions.find(s=>s.mood)?.mood||'';
+          const cats=[...new Set(daySessions.map(s=>s.category).filter(Boolean))];
           if(ctx.parsed.y===0)return mood?' nessuna sessione  '+mood:' nessuna sessione';
           const lines=[' '+toHours(ctx.parsed.y)+(mood?'  '+mood:'')];
           if(cats.length)lines.push(' '+cats.join(', '));
@@ -681,23 +674,7 @@ async function loadSessions(){
       categories=JSON.parse(localStorage.getItem('focus_categories')||'[]');
       renderCategories();
     }
-    // umore
-    if(data.moods&&Object.keys(data.moods).length>0){
-      // normalizza chiavi date da Sheets
-      const rawMoods=data.moods||{};
-      moods={};
-      Object.keys(rawMoods).forEach(k=>{
-        // le chiavi dell'umore da Sheets sono già YYYY-MM-DD, non usare new Date()
-        const norm=k?k.toString().slice(0,10):'';
-        if(norm&&norm.includes('-')) moods[norm]=rawMoods[k];
-      });
-      localStorage.setItem('focus_moods',JSON.stringify(moods));
-    } else {
-      const rawLocal=JSON.parse(localStorage.getItem('focus_moods')||'{}');
-      moods={};
-      Object.keys(rawLocal).forEach(k=>{const norm=normalizeDate(k);if(norm)moods[norm]=rawLocal[k];});
-    }
-    renderMoodUI();
+
     refresh();
     setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
     document.getElementById('config-panel').classList.add('hidden');
@@ -793,8 +770,7 @@ window.addEventListener('resize',()=>{if(chart)chart.resize();});
 document.getElementById('inp-date').value=todayStr;
 // Carica da localStorage come fallback immediato
 categories=JSON.parse(localStorage.getItem('focus_categories')||'[]');
-const rawInit=JSON.parse(localStorage.getItem('focus_moods')||'{}');
-moods={};Object.keys(rawInit).forEach(k=>{const norm=normalizeDate(k);if(norm)moods[norm]=rawInit[k];});
+
 renderCategories();renderMoodUI();refresh();
 if(SCRIPT_URL){document.getElementById('script-url').value=SCRIPT_URL;loadSessions();}
 else{setStatus('Configura la connessione (⚙️)','wait');}
