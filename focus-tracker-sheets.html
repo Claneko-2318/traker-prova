@@ -638,15 +638,13 @@ async function api(params){
 function normalizeDate(d){
   d=d?d.toString():'';
   if(d.length>10){const dt=new Date(d);if(!isNaN(dt.getTime()))return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');}
-  return d.slice(0,10);
+  return d.slice(0,10)||'';
 }
-
 async function loadSessions(){
   if(!SCRIPT_URL)return;
   setStatus('Connessione in corso…','wait');
   const data=await api({action:'get'});
   if(data&&data.ok){
-    // sessioni
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
     if(data.categories&&data.categories.length>0){
@@ -661,10 +659,18 @@ async function loadSessions(){
     }
     // umore
     if(data.moods&&Object.keys(data.moods).length>0){
-      moods=data.moods;
+      // normalizza chiavi date da Sheets
+      const rawMoods=data.moods||{};
+      moods={};
+      Object.keys(rawMoods).forEach(k=>{
+        const norm=normalizeDate(k);
+        if(norm) moods[norm]=rawMoods[k];
+      });
       localStorage.setItem('focus_moods',JSON.stringify(moods));
     } else {
-      moods=JSON.parse(localStorage.getItem('focus_moods')||'{}');
+      const rawLocal=JSON.parse(localStorage.getItem('focus_moods')||'{}');
+      moods={};
+      Object.keys(rawLocal).forEach(k=>{const norm=normalizeDate(k);if(norm)moods[norm]=rawLocal[k];});
     }
     renderMoodUI();
     refresh();
@@ -750,7 +756,8 @@ window.addEventListener('resize',()=>{if(chart)chart.resize();});
 document.getElementById('inp-date').value=todayStr;
 // Carica da localStorage come fallback immediato
 categories=JSON.parse(localStorage.getItem('focus_categories')||'[]');
-moods=JSON.parse(localStorage.getItem('focus_moods')||'{}');
+const rawInit=JSON.parse(localStorage.getItem('focus_moods')||'{}');
+moods={};Object.keys(rawInit).forEach(k=>{const norm=normalizeDate(k);if(norm)moods[norm]=rawInit[k];});
 renderCategories();renderMoodUI();refresh();
 if(SCRIPT_URL){document.getElementById('script-url').value=SCRIPT_URL;loadSessions();}
 else{setStatus('Configura la connessione (⚙️)','wait');}
