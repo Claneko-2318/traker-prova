@@ -425,8 +425,10 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 function setStatus(msg,type){
   document.getElementById('config-status').textContent=msg;
   document.getElementById('config-status').className='config-status '+type;
-  document.getElementById('status-text').textContent=msg.length>40?msg.slice(0,40)+'…':msg;
-  document.getElementById('status-dot').className='status-dot-circle '+(type==='ok'?'ok':type==='err'?'err':'');
+  const dot=document.getElementById('status-dot');
+  const txt=document.getElementById('status-text');
+  dot.className='status-dot-circle '+(type==='ok'?'ok':type==='err'?'err':'');
+  txt.textContent=type==='ok'?'Connesso':type==='err'?'Non connesso':'Connessione in corso…';
 }
 function showPage(name){
   document.querySelectorAll('.page-section').forEach(p=>p.classList.remove('active'));
@@ -452,6 +454,7 @@ function setMood(emoji){
   moods[k]=emoji;
   localStorage.setItem('focus_moods',JSON.stringify(moods));
   renderMoodUI();
+  refresh();
   if(SCRIPT_URL) api({action:'saveMood',date:k,emoji}).then(()=>toast('Umore salvato per il '+fmt(k)+'!')).catch(()=>toast('Umore salvato per il '+fmt(k)+'!'));
   else toast('Umore salvato per il '+fmt(k)+'!');
 }
@@ -637,8 +640,18 @@ async function api(params){
 
 function normalizeDate(d){
   d=d?d.toString():'';
-  if(d.length>10){const dt=new Date(d);if(!isNaN(dt.getTime()))return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');}
-  return d.slice(0,10)||'';
+  if(!d) return '';
+  // già YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  // ha T o spazio — prendi solo i primi 10 caratteri se inizia con YYYY-
+  if(/^\d{4}-/.test(d)) return d.slice(0,10);
+  // formato verbose da Sheets (es. "Sun Apr 13 2026 00:00:00 GMT+0200")
+  // aggiungiamo T12:00:00 per stare nel mezzo del giorno ed evitare shift UTC
+  const clean=d.replace(/\s+/g,' ').trim();
+  const dt=new Date(clean.includes('T')?clean:clean+' 12:00:00');
+  if(!isNaN(dt.getTime()))
+    return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+  return d.slice(0,10);
 }
 async function loadSessions(){
   if(!SCRIPT_URL)return;
