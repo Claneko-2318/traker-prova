@@ -308,6 +308,7 @@ function setStatus(msg, type) {
 function fmt(dateStr) {
   if (!dateStr) return '—';
   const s = dateStr.toString().slice(0,10);
+  if (!s.includes('-')) return dateStr;
   const [y,m,d] = s.split('-');
   return d + '/' + m + '/' + y;
 }
@@ -512,7 +513,7 @@ function renderChart(filtered) {
         pointBorderWidth: 2,
         pointRadius: data.map(v=>v>0?5:2),
         pointHoverRadius: 7,
-        borderWidth: 2, fill: true, tension: 0.38,
+        borderWidth: 2, fill: true, tension: 0,
       }]
     },
     options: {
