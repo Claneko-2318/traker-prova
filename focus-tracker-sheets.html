@@ -806,7 +806,7 @@ function exportPDF(){
 
   // righe
   doc.setFont('helvetica','normal');doc.setTextColor(46,31,15);
-  const rowH=7;
+  const rowH=8;
   [...filtered].reverse().forEach(s=>{
     if(y>275){
       doc.addPage();
@@ -814,15 +814,16 @@ function exportPDF(){
       y=15;
     }
     doc.setFontSize(8);
-    doc.text(fmt(s.date),                                          cols[0],y);
-    doc.text((s.category||'—').slice(0,16),                        cols[1],y);
-    doc.text(toHours(Number(s.minutes)),                           cols[2],y);
-    doc.text(s.pomodori?s.pomodori+'×'+s.durata_pomodoro:'—',      cols[3],y);
-    doc.text(s.note?(s.note.length>24?s.note.slice(0,24)+'…':s.note):'—', cols[4],y);
+    const textY=y+4;
+    doc.text(fmt(s.date),                                          cols[0],textY);
+    doc.text((s.category||'—').slice(0,16),                        cols[1],textY);
+    doc.text(toHours(Number(s.minutes)),                           cols[2],textY);
+    doc.text(s.pomodori?s.pomodori+'×'+s.durata_pomodoro:'—',      cols[3],textY);
+    doc.text(s.note?(s.note.length>24?s.note.slice(0,24)+'…':s.note):'—', cols[4],textY);
     const moodText={'😴':'stanca','😐':'media','🙂':'bene','⚡':'top'}[s.mood]||s.mood||'—';
-    doc.text(moodText, cols[5], y);
+    doc.text(moodText, cols[5], textY);
     y+=rowH;
-    doc.setDrawColor(232,217,192);doc.line(14,y-1,196,y-1);
+    doc.setDrawColor(232,217,192);doc.line(14,y,196,y);
   });
 
   // footer
