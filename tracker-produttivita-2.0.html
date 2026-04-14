@@ -181,7 +181,7 @@ textarea:focus{border-color:var(--brown);}
 
 /* tabella */
 .table-wrap{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:#fff;margin-top:1rem;}
-.table-scroll{max-height:220px;overflow-y:scroll;border-radius:0 0 var(--radius-lg) var(--radius-lg);}
+.table-scroll{height:220px;overflow-y:auto;border-radius:0 0 var(--radius-lg) var(--radius-lg);}
 .table-scroll::-webkit-scrollbar{width:8px;}
 .table-scroll::-webkit-scrollbar-track{background:var(--surface);border-radius:99px;}
 .table-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;border:2px solid var(--surface);}
@@ -710,9 +710,23 @@ function renderWeeklyBreakdown(filtered){
   if(!el) return;
   if(filtered.length===0){el.innerHTML='<span style="font-size:13px;color:var(--text-muted);font-style:italic;">nessun dato</span>';return;}
   const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+  // trova il primo lunedì del mese (o il 1 se è già lunedì)
+  const firstDay=new Date(viewYear,viewMonth,1).getDay(); // 0=dom,1=lun,...
+  const offsetToMonday=firstDay===0?1:(firstDay===1?0:8-firstDay);
   const weeks=[];
-  let day=1;
   let wk=1;
+  // settimana parziale iniziale (dal 1 a domenica)
+  if(offsetToMonday>0){
+    const end=Math.min(offsetToMonday,daysInMonth);
+    const startStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-01';
+    const endStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(end).padStart(2,'0');
+    const wkSessions=filtered.filter(s=>s.date>=startStr&&s.date<=endStr);
+    const mins=wkSessions.reduce((a,s)=>a+Number(s.minutes),0);
+    weeks.push({wk,startDay:1,endDay:end,mins,count:wkSessions.length});
+    wk++;
+  }
+  // settimane complete da lunedì a domenica
+  let day=offsetToMonday+1;
   while(day<=daysInMonth){
     const end=Math.min(day+6,daysInMonth);
     const startStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
@@ -722,12 +736,20 @@ function renderWeeklyBreakdown(filtered){
     weeks.push({wk,startDay:day,endDay:end,mins,count:wkSessions.length});
     day+=7;wk++;
   }
-  el.innerHTML=weeks.map(w=>`
-    <div style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 1rem;text-align:center;">
+  el.innerHTML=weeks.map(w=>{
+    const activeDays=new Set(filtered.filter(s=>{
+      const startStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(w.startDay).padStart(2,'0');
+      const endStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(w.endDay).padStart(2,'0');
+      return s.date>=startStr&&s.date<=endStr;
+    }).map(s=>s.date)).size;
+    const avg=activeDays>0?Math.round(w.mins/activeDays):0;
+    return`<div style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 1rem;text-align:center;">
       <div style="font-size:10px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">sett. ${w.wk} · ${String(w.startDay).padStart(2,'0')}–${String(w.endDay).padStart(2,'0')}</div>
       <div style="font-family:'Lora',serif;font-size:1.3rem;color:var(--brown-dark);font-weight:500;">${w.mins>0?toHours(w.mins):'—'}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${w.count} session${w.count===1?'e':'i'}</div>
-    </div>`).join('');
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${w.count} session${w.count===1?'e':'i'}</div>
+      ${avg>0?`<div style="font-size:11px;color:var(--brown);margin-top:2px;">~${toHours(avg)}/giorno</div>`:''}
+    </div>`;
+  }).join('');
 }
 function renderChart(filtered){
   const days=new Date(viewYear,viewMonth+1,0).getDate();
