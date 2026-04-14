@@ -181,7 +181,7 @@ textarea:focus{border-color:var(--brown);}
 
 /* tabella */
 .table-wrap{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:#fff;margin-top:1rem;}
-.table-scroll{height:220px;overflow-y:auto;border-radius:0 0 var(--radius-lg) var(--radius-lg);}
+.table-scroll{max-height:220px;overflow-y:scroll;border-radius:0 0 var(--radius-lg) var(--radius-lg);}
 .table-scroll::-webkit-scrollbar{width:8px;}
 .table-scroll::-webkit-scrollbar-track{background:var(--surface);border-radius:99px;}
 .table-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;border:2px solid var(--surface);}
@@ -742,7 +742,7 @@ function renderWeeklyBreakdown(filtered){
       const endStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(w.endDay).padStart(2,'0');
       return s.date>=startStr&&s.date<=endStr;
     }).map(s=>s.date)).size;
-    const avg=activeDays>0?Math.round(w.mins/activeDays):0;
+    const avg=(activeDays>0&&w.mins>0)?Math.round(w.mins/activeDays):0;
     return`<div style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 1rem;text-align:center;">
       <div style="font-size:10px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">sett. ${w.wk} · ${String(w.startDay).padStart(2,'0')}–${String(w.endDay).padStart(2,'0')}</div>
       <div style="font-family:'Lora',serif;font-size:1.3rem;color:var(--brown-dark);font-weight:500;">${w.mins>0?toHours(w.mins):'—'}</div>
