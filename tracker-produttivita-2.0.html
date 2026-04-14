@@ -400,7 +400,14 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
     <div class="card" style="padding:0.75rem 1.25rem;">
       <div id="weekly-breakdown" style="display:flex;flex-wrap:wrap;gap:10px;"></div>
     </div>
-    <div class="section-label" style="margin-top:1.5rem;">sessioni registrate</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1.5rem;margin-bottom:0.75rem;">
+      <div class="section-label" style="margin:0;flex:1;">sessioni registrate</div>
+      <div style="display:flex;gap:4px;margin-left:12px;">
+        <button class="btn btn-sm tbl-filter-btn active" data-limit="5" onclick="setTableLimit(5)">ultimi 5</button>
+        <button class="btn btn-sm tbl-filter-btn" data-limit="10" onclick="setTableLimit(10)">ultimi 10</button>
+        <button class="btn btn-sm tbl-filter-btn" data-limit="0" onclick="setTableLimit(0)">tutti</button>
+      </div>
+    </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Data</th><th>Categoria</th><th>Durata</th><th>Dettaglio</th><th>Note</th><th>Umore</th><th>Progetti</th><th></th></tr></thead>
@@ -677,10 +684,12 @@ function updateStats(filtered){
 }
 
 
+let tableLimit=5;
+function setTableLimit(n){tableLimit=n;document.querySelectorAll('.tbl-filter-btn').forEach(b=>b.classList.toggle('active',Number(b.dataset.limit)===(n===0?0:n)));renderTable(getFiltered(viewYear,viewMonth));}
 function renderTable(filtered){
   const tbody=document.getElementById('table-body');
   const reversed=[...filtered].reverse();
-  const shown=reversed;
+  const shown=tableLimit>0?reversed.slice(0,tableLimit):reversed;
   if(reversed.length===0){tbody.innerHTML='<tr><td class="empty-cell" colspan="8">nessuna sessione in questo mese</td></tr>';return;}
   tbody.innerHTML=shown.map(s=>{
     const k=s.date;
@@ -737,17 +746,12 @@ function renderWeeklyBreakdown(filtered){
     day+=7;wk++;
   }
   el.innerHTML=weeks.map(w=>{
-    const activeDays=new Set(filtered.filter(s=>{
-      const startStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(w.startDay).padStart(2,'0');
-      const endStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(w.endDay).padStart(2,'0');
-      return s.date>=startStr&&s.date<=endStr;
-    }).map(s=>s.date)).size;
-    const avg=(activeDays>0&&w.mins>0)?Math.round(w.mins/activeDays):0;
+
     return`<div style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 1rem;text-align:center;">
       <div style="font-size:10px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">sett. ${w.wk} · ${String(w.startDay).padStart(2,'0')}–${String(w.endDay).padStart(2,'0')}</div>
       <div style="font-family:'Lora',serif;font-size:1.3rem;color:var(--brown-dark);font-weight:500;">${w.mins>0?toHours(w.mins):'—'}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${w.count} session${w.count===1?'e':'i'}</div>
-      ${avg>0?`<div style="font-size:11px;color:var(--brown);margin-top:2px;">~${toHours(avg)}/giorno</div>`:''}
+
     </div>`;
   }).join('');
 }
