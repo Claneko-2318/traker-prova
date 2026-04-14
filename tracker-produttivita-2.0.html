@@ -783,8 +783,10 @@ async function loadSessions(){
     if(data.projects&&data.projects.length>0){
       projects=data.projects;
       localStorage.setItem('focus_projects',JSON.stringify(projects));
-    } else {
-      projects=JSON.parse(localStorage.getItem('focus_projects')||'[]');
+    } else if(!data.projects||data.projects.length===0){
+      // Sheets non ha ancora progetti — tieni quelli in localStorage se ci sono
+      const local=JSON.parse(localStorage.getItem('focus_projects')||'[]');
+      projects=local;
     }
     renderProjects();
     if(data.categories&&data.categories.length>0){
