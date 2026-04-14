@@ -475,7 +475,7 @@ function selectCatColor(el){
 }
 function saveCategories(){
   localStorage.setItem('focus_categories',JSON.stringify(categories));
-  if(SCRIPT_URL) api({action:'saveCategories',categories:categories.map(c=>c.name||c)}).catch(()=>{});
+  if(SCRIPT_URL) api({action:'saveCategories',categories:categories.map(c=>(c.name||c)+'|'+(c.color||'#EAD9C0'))}).catch(()=>{});
   localStorage.setItem('focus_categories',JSON.stringify(categories));
 }
 function renderCategories(){
@@ -675,7 +675,10 @@ async function loadSessions(){
     if(data.categories&&data.categories.length>0){
       const saved=JSON.parse(localStorage.getItem('focus_categories')||'[]');
       const colorMap={};saved.forEach(c=>{if(c.name)colorMap[c.name]=c.color;});
-      categories=data.categories.map(n=>({name:n,color:colorMap[n]||'#EAD9C0'}));
+      categories=data.categories.map(n=>{
+        if(n.includes('|')){const[name,color]=n.split('|');return{name,color:color||colorMap[name]||'#EAD9C0'};}
+        return{name:n,color:colorMap[n]||'#EAD9C0'};
+      });
       localStorage.setItem('focus_categories',JSON.stringify(categories));
       renderCategories();
     } else {
