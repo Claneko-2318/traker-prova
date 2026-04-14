@@ -705,7 +705,7 @@ function renderChart(filtered){
   setTimeout(()=>{if(chart)chart.resize();},50);
 }
 
-function refresh(){const f=getFiltered(viewYear,viewMonth);updateStats(f);renderTable(f);renderChart(f);}
+function refresh(){const f=getFiltered(viewYear,viewMonth);updateStats(f);renderTable(f);renderChart(f);renderProjSummary();}
 
 function openModal(id){
   const s=sessions.find(x=>x.id.toString()===id.toString());if(!s)return;
