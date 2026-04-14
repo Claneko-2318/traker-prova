@@ -181,6 +181,11 @@ textarea:focus{border-color:var(--brown);}
 
 /* tabella */
 .table-wrap{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:#fff;margin-top:1rem;}
+.table-scroll{max-height:320px;overflow-y:auto;border-radius:0 0 var(--radius-lg) var(--radius-lg);}
+.table-scroll::-webkit-scrollbar{width:8px;}
+.table-scroll::-webkit-scrollbar-track{background:var(--surface);border-radius:99px;}
+.table-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;border:2px solid var(--surface);}
+.table-scroll::-webkit-scrollbar-thumb:hover{background:var(--brown);}
 table{width:100%;border-collapse:collapse;font-size:13px;}
 thead{background:var(--surface);}
 thead th{padding:9px 12px;text-align:left;font-weight:500;font-size:11px;letter-spacing:0.04em;color:var(--text-muted);border-bottom:1px solid var(--border);}
@@ -391,14 +396,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
       <div class="stat-card"><div class="stat-label">streak attuale</div><div class="stat-value" id="stat-streak">—</div><div class="stat-sub">giorni consecutivi</div></div>
     </div>
     <div class="compare-row" id="compare-row"><span>—</span></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1.5rem;margin-bottom:0.75rem;">
-      <div class="section-label" style="margin:0;flex:1;">sessioni registrate</div>
-      <div style="display:flex;gap:4px;margin-left:12px;">
-        <button class="btn btn-sm tbl-filter-btn active" data-limit="5" onclick="setTableLimit(5)">ultimi 5</button>
-        <button class="btn btn-sm tbl-filter-btn" data-limit="10" onclick="setTableLimit(10)">ultimi 10</button>
-        <button class="btn btn-sm tbl-filter-btn" data-limit="0" onclick="setTableLimit(0)">tutti</button>
-      </div>
-    </div>
+    <div class="section-label" style="margin-top:1.5rem;">sessioni registrate</div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Data</th><th>Categoria</th><th>Durata</th><th>Dettaglio</th><th>Note</th><th>Umore</th><th>Progetti</th><th></th></tr></thead>
@@ -674,13 +672,11 @@ function updateStats(filtered){
   else{const diff=totalMin-prevMin,pct=Math.abs(Math.round((diff/prevMin)*100));let arrow,cls,txt;if(diff>0){arrow='↑';cls='trend-up';txt=`+${pct}% rispetto a ${prevLbl} (${toHours(prevMin)})`;}else if(diff<0){arrow='↓';cls='trend-down';txt=`−${pct}% rispetto a ${prevLbl} (${toHours(prevMin)})`;}else{arrow='=';cls='trend-eq';txt=`uguale a ${prevLbl}`;}el.innerHTML=`<span class="compare-arrow ${cls}">${arrow}</span><span><strong>${toHours(totalMin)}</strong> questo mese — ${txt}</span>`;}
 }
 
-let tableLimit=5;
-function setTableLimit(n){tableLimit=n;document.querySelectorAll('.tbl-filter-btn').forEach(b=>b.classList.toggle('active',Number(b.dataset.limit)===(n===0?0:n)));renderTable(getFiltered(viewYear,viewMonth));}
 
 function renderTable(filtered){
   const tbody=document.getElementById('table-body');
   const reversed=[...filtered].reverse();
-  const shown=tableLimit>0?reversed.slice(0,tableLimit):reversed;
+  const shown=reversed;
   if(reversed.length===0){tbody.innerHTML='<tr><td class="empty-cell" colspan="8">nessuna sessione in questo mese</td></tr>';return;}
   tbody.innerHTML=shown.map(s=>{
     const k=s.date;
