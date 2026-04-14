@@ -217,8 +217,8 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
 .proj-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-top:1.5rem;}
 .proj-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--surface2);}
 .proj-row:last-child{border-bottom:none;}
-.proj-hours{font-family:'Lora',serif;font-size:1.1rem;color:var(--brown-dark);font-weight:500;}
-.proj-sessions{font-size:11px;color:var(--text-muted);}
+.proj-hours{font-family:'Lora',serif;font-size:1.1rem;color:var(--brown-dark,#4E2E14);font-weight:500;}
+.proj-sessions{font-size:11px;color:var(--text-muted,#9C7A55);}
 .spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--brown);border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:5px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 #toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--brown-dark);color:#FAF0E0;font-size:13px;padding:10px 18px;border-radius:var(--radius);opacity:0;pointer-events:none;transition:opacity 0.3s;z-index:300;}
@@ -560,27 +560,28 @@ function removeProject(name){
 }
 function renderProjSummary(){
   const el=document.getElementById('proj-summary-body');
-  if(!el)return;
-  if(projects.length===0){
-    el.innerHTML='<span style="font-size:13px;color:var(--text-muted);font-style:italic;">nessun progetto ancora</span>';
+  if(!el) return;
+  if(!projects||projects.length===0){
+    el.innerHTML='<p style="font-size:13px;color:var(--text-muted);font-style:italic;margin:0;">Nessun progetto creato. Aggiungili dalla pagina di inserimento!</p>';
     return;
   }
-  const totals=projects.map(p=>{
-    const linked=sessions.filter(s=>{
+  let html='';
+  projects.forEach(function(p){
+    const linked=sessions.filter(function(s){
       if(!s.projects) return false;
-      if(Array.isArray(s.projects)) return s.projects.includes(p);
-      return s.projects.toString().split(',').map(x=>x.trim()).includes(p);
+      const arr=Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(function(x){return x.trim();});
+      return arr.indexOf(p)!==-1;
     });
-    return{name:p,minutes:linked.reduce((a,s)=>a+Number(s.minutes),0),count:linked.length};
-  }).sort((a,b)=>b.minutes-a.minutes);
-  el.innerHTML=totals.map(t=>`
-    <div class="proj-row">
-      <div>
-        <div style="font-size:13px;font-weight:500;color:var(--text);">${t.name}</div>
-        <div class="proj-sessions">${t.count>0?t.count+' session'+(t.count===1?'e':'i')+' collegate':'nessuna sessione collegata ancora'}</div>
-      </div>
-      <div class="proj-hours">${t.minutes>0?toHours(t.minutes):'—'}</div>
-    </div>`).join('');
+    const mins=linked.reduce(function(a,s){return a+Number(s.minutes);},0);
+    html+='<div class="proj-row">'
+      +'<div>'
+      +'<div style="font-size:13px;font-weight:500;color:var(--text,#2E1F0F);">'+p+'</div>'
+      +'<div class="proj-sessions">'+(linked.length>0?linked.length+' session'+(linked.length===1?'e':'i')+' collegate':'nessuna sessione collegata ancora')+'</div>'
+      +'</div>'
+      +'<div class="proj-hours">'+(mins>0?toHours(mins):'—')+'</div>'
+      +'</div>';
+  });
+  el.innerHTML=html;
 }
 function saveCategories(){
   localStorage.setItem('focus_categories',JSON.stringify(categories));
@@ -827,6 +828,7 @@ async function loadSessions(){
     refresh();
     setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
     document.getElementById('config-panel').classList.add('hidden');
+    renderProjSummary();
   }else if(data){setStatus('Errore: '+(data.error||'risposta non valida'),'err');}
 }
 
