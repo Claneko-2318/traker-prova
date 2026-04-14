@@ -242,14 +242,6 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
     </svg>
   </div>
 
-  <div class="nav-icon" data-page="projects" onclick="showPage('projects')" title="Progetti">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 6h18M3 12h18M3 18h18"/>
-      <circle cx="20" cy="6" r="2" fill="currentColor" stroke="none"/>
-      <circle cx="20" cy="12" r="2" fill="currentColor" stroke="none"/>
-      <circle cx="20" cy="18" r="2" fill="currentColor" stroke="none"/>
-    </svg>
-  </div>
   <div class="nav-icon-spacer"></div>
   <div class="nav-icon" onclick="window.open('https://docs.google.com/spreadsheets/d/1Qz5GMgGcltBylY2-u3qjE0-LmXr4fn0ZOWPiSvJcYeE/edit','_blank')" title="Apri Google Sheet">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -409,20 +401,18 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
         <canvas id="myChart" role="img" aria-label="Grafico sessioni del mese">Nessun dato.</canvas>
       </div>
     </div>
+    <div class="section-label" style="margin-top:2rem;">riepilogo progetti</div>
+    <div class="card">
+      <div id="proj-summary-body">
+        <span style="font-size:13px;color:var(--text-muted);font-style:italic;">nessun progetto ancora</span>
+      </div>
+    </div>
   </div>
 
 </div>
 
 
-  <!-- PAGINA 3: Progetti -->
-  <div class="page-section" id="page-projects">
-    <div class="section-label" style="margin-top:0;">riepilogo progetti</div>
-    <div class="card">
-      <div id="proj-summary-body">
-        <span style="font-size:13px;color:var(--text-muted);font-style:italic;">crea i tuoi primi progetti nella pagina di inserimento</span>
-      </div>
-    </div>
-  </div>
+
 
 </div><!-- /main-box -->
 
@@ -493,7 +483,6 @@ function showPage(name){
   document.getElementById('page-'+name).classList.add('active');
   document.querySelector('.nav-icon[data-page="'+name+'"]')?.classList.add('active');
   if(name==='data'){const f=getFiltered(viewYear,viewMonth);renderTable(f);renderChart(f);}
-  if(name==='projects'){renderProjSummary();}
 }
 function toggleConfig(){document.getElementById('config-panel').classList.toggle('hidden');}
 
