@@ -241,6 +241,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
       <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
     </svg>
   </div>
+
   <div class="nav-icon" data-page="projects" onclick="showPage('projects')" title="Progetti">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 6h18M3 12h18M3 18h18"/>
@@ -411,11 +412,15 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
   </div>
 
 </div>
+
+
   <!-- PAGINA 3: Progetti -->
   <div class="page-section" id="page-projects">
     <div class="section-label" style="margin-top:0;">riepilogo progetti</div>
-    <div class="card" id="proj-summary-card">
-      <div id="proj-summary-body"><span style="font-size:13px;color:var(--text-muted);font-style:italic;">nessun progetto ancora</span></div>
+    <div class="card">
+      <div id="proj-summary-body">
+        <span style="font-size:13px;color:var(--text-muted);font-style:italic;">crea i tuoi primi progetti nella pagina di inserimento</span>
+      </div>
     </div>
   </div>
 
@@ -527,7 +532,6 @@ function renderProjects(){
   chips.innerHTML=projects.length===0?'<span class="cat-empty">nessuno ancora</span>':
     projects.map(p=>`<div class="cat-chip">${p}<button class="cat-chip-remove" onclick="removeProject('${p.replace(/'/g,'\\')}')">×</button></div>`).join('');
   renderProjSelector('inp-proj-chips');
-  renderProjSummary();
 }
 function renderProjSelector(containerId, selectedProjs=[]){
   const el=document.getElementById(containerId);
@@ -789,6 +793,7 @@ async function loadSessions(){
       projects=local;
     }
     renderProjects();
+    renderProjSummary();
     if(data.categories&&data.categories.length>0){
       const saved=JSON.parse(localStorage.getItem('focus_categories')||'[]');
       const colorMap={};saved.forEach(c=>{if(c.name)colorMap[c.name]=c.color;});
