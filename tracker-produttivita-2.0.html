@@ -769,7 +769,7 @@ function openModal(id){
   document.getElementById('modal-id').value=s.id;
   document.getElementById('modal-date').value=s.date;
   const sel=document.getElementById('modal-cat');
-  sel.innerHTML='<option value="">— scegli —</option>'+categories.map(c=>`<option value="${c}"${c===s.category?' selected':''}>${c}</option>`).join('');
+  sel.innerHTML='<option value="">— scegli —</option>'+categories.map(c=>{const n=c.name||c;return`<option value="${n}"${n===s.category?' selected':''}>${n}</option>`;}).join('');
   document.getElementById('modal-pomodori').value=s.pomodori||'';
   const knownDurate=['25','35','15','50'];
   const dur=s.durata_pomodoro?s.durata_pomodoro.toString():'25';
