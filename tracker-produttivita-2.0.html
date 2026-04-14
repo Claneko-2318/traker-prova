@@ -215,7 +215,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
 .proj-chip-remove{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;line-height:1;padding:0 0 0 2px;}
 .proj-chip-remove:hover{color:#8B1A1A;}
 .proj-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-top:1.5rem;}
-.proj-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--surface2);cursor:pointer;transition:background 0.1s;}
+.proj-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid var(--surface2);cursor:pointer;transition:background 0.1s;}
 .proj-row:hover{background:var(--surface);}
 .proj-row:last-child{border-bottom:none;}
 .proj-detail{display:none;padding:8px 0 4px 0;border-bottom:0.5px solid var(--surface2);}
@@ -604,9 +604,9 @@ function renderProjSummary(){
       +'</div>';
   }).join('');
 }
-function toggleProjDetail(detailId,chevronId){
-  const d=document.getElementById(detailId);
-  const c=document.getElementById(chevronId);
+function toggleProjDetail(i){
+  const d=document.getElementById('proj-detail-'+i);
+  const c=document.getElementById('proj-chevron-'+i);
   if(!d||!c) return;
   d.classList.toggle('open');
   c.classList.toggle('open');
