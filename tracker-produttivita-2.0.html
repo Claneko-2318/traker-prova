@@ -181,7 +181,7 @@ textarea:focus{border-color:var(--brown);}
 
 /* tabella */
 .table-wrap{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:#fff;margin-top:1rem;}
-.table-scroll{max-height:320px;overflow-y:auto;border-radius:0 0 var(--radius-lg) var(--radius-lg);}
+.table-scroll{max-height:220px;overflow-y:scroll;border-radius:0 0 var(--radius-lg) var(--radius-lg);}
 .table-scroll::-webkit-scrollbar{width:8px;}
 .table-scroll::-webkit-scrollbar-track{background:var(--surface);border-radius:99px;}
 .table-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;border:2px solid var(--surface);}
@@ -396,6 +396,10 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
       <div class="stat-card"><div class="stat-label">streak attuale</div><div class="stat-value" id="stat-streak">—</div><div class="stat-sub">giorni consecutivi</div></div>
     </div>
     <div class="compare-row" id="compare-row"><span>—</span></div>
+    <div class="section-label" style="margin-top:1.5rem;">medie per settimana</div>
+    <div class="card" style="padding:0.75rem 1.25rem;">
+      <div id="weekly-breakdown" style="display:flex;flex-wrap:wrap;gap:10px;"></div>
+    </div>
     <div class="section-label" style="margin-top:1.5rem;">sessioni registrate</div>
     <div class="table-wrap">
       <table>
@@ -701,6 +705,30 @@ function renderTable(filtered){
   }).join('');
 }
 
+function renderWeeklyBreakdown(filtered){
+  const el=document.getElementById('weekly-breakdown');
+  if(!el) return;
+  if(filtered.length===0){el.innerHTML='<span style="font-size:13px;color:var(--text-muted);font-style:italic;">nessun dato</span>';return;}
+  const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+  const weeks=[];
+  let day=1;
+  let wk=1;
+  while(day<=daysInMonth){
+    const end=Math.min(day+6,daysInMonth);
+    const startStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    const endStr=viewYear+'-'+String(viewMonth+1).padStart(2,'0')+'-'+String(end).padStart(2,'0');
+    const wkSessions=filtered.filter(s=>s.date>=startStr&&s.date<=endStr);
+    const mins=wkSessions.reduce((a,s)=>a+Number(s.minutes),0);
+    weeks.push({wk,startDay:day,endDay:end,mins,count:wkSessions.length});
+    day+=7;wk++;
+  }
+  el.innerHTML=weeks.map(w=>`
+    <div style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 1rem;text-align:center;">
+      <div style="font-size:10px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">sett. ${w.wk} · ${String(w.startDay).padStart(2,'0')}–${String(w.endDay).padStart(2,'0')}</div>
+      <div style="font-family:'Lora',serif;font-size:1.3rem;color:var(--brown-dark);font-weight:500;">${w.mins>0?toHours(w.mins):'—'}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${w.count} session${w.count===1?'e':'i'}</div>
+    </div>`).join('');
+}
 function renderChart(filtered){
   const days=new Date(viewYear,viewMonth+1,0).getDate();
   const labels=Array.from({length:days},(_,i)=>String(i+1).padStart(2,'0'));
@@ -734,7 +762,7 @@ function renderChart(filtered){
   setTimeout(()=>{if(chart)chart.resize();},50);
 }
 
-function refresh(){const f=getFiltered(viewYear,viewMonth);updateStats(f);renderTable(f);renderChart(f);renderProjSummary();}
+function refresh(){const f=getFiltered(viewYear,viewMonth);updateStats(f);renderWeeklyBreakdown(f);renderTable(f);renderChart(f);renderProjSummary();}
 
 function openModal(id){
   const s=sessions.find(x=>x.id.toString()===id.toString());if(!s)return;
