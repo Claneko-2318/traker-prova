@@ -800,7 +800,6 @@ async function loadSessions(){
       renderCategories();
     } else {
       categories=JSON.parse(localStorage.getItem('focus_categories')||'[]');
-projects=JSON.parse(localStorage.getItem('focus_projects')||'[]');
       renderCategories();
     }
     // umore
