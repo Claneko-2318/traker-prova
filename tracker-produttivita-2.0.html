@@ -215,7 +215,16 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
 .proj-chip-remove{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;line-height:1;padding:0 0 0 2px;}
 .proj-chip-remove:hover{color:#8B1A1A;}
 .proj-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-top:1.5rem;}
-.proj-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--surface2);}
+.proj-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--surface2);cursor:pointer;transition:background 0.1s;}
+.proj-row:hover{background:var(--surface);}
+.proj-row:last-child{border-bottom:none;}
+.proj-detail{display:none;padding:8px 0 4px 0;border-bottom:0.5px solid var(--surface2);}
+.proj-detail.open{display:block;}
+.proj-detail table{width:100%;border-collapse:collapse;font-size:12px;}
+.proj-detail td{padding:5px 8px;color:var(--text-mid);border-bottom:0.5px solid var(--surface2);}
+.proj-detail tr:last-child td{border-bottom:none;}
+.proj-chevron{font-size:12px;color:var(--text-muted);transition:transform 0.2s;display:inline-block;}
+.proj-chevron.open{transform:rotate(90deg);}
 .proj-row:last-child{border-bottom:none;}
 .proj-hours{font-family:'Lora',serif;font-size:1.1rem;color:var(--brown-dark,#4E2E14);font-weight:500;}
 .proj-sessions{font-size:11px;color:var(--text-muted,#9C7A55);}
@@ -392,7 +401,7 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Data</th><th>Categoria</th><th>Durata</th><th>Dettaglio</th><th>Note</th><th>Umore</th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th>Categoria</th><th>Durata</th><th>Dettaglio</th><th>Note</th><th>Umore</th><th>Progetti</th><th></th></tr></thead>
         <tbody id="table-body"></tbody>
       </table>
     </div>
@@ -551,26 +560,56 @@ function renderProjSummary(){
   const el=document.getElementById('proj-summary-body');
   if(!el) return;
   if(!projects||projects.length===0){
-    el.innerHTML='<p style="font-size:13px;color:var(--text-muted);font-style:italic;margin:0;">Nessun progetto creato. Aggiungili dalla pagina di inserimento!</p>';
+    el.innerHTML='<p style="font-size:13px;color:var(--text-muted,#9C7A55);font-style:italic;margin:0;">Nessun progetto creato. Aggiungili dalla pagina di inserimento!</p>';
     return;
   }
-  let html='';
-  projects.forEach(function(p){
+  let rows=[];
+  projects.forEach(function(p,i){
     const linked=sessions.filter(function(s){
       if(!s.projects) return false;
       const arr=Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(function(x){return x.trim();});
       return arr.indexOf(p)!==-1;
-    });
+    }).sort(function(a,b){return b.date.localeCompare(a.date);});
     const mins=linked.reduce(function(a,s){return a+Number(s.minutes);},0);
-    html+='<div class="proj-row">'
-      +'<div>'
-      +'<div style="font-size:13px;font-weight:500;color:var(--text,#2E1F0F);">'+p+'</div>'
-      +'<div class="proj-sessions">'+(linked.length>0?linked.length+' session'+(linked.length===1?'e':'i')+' collegate':'nessuna sessione collegata ancora')+'</div>'
-      +'</div>'
-      +'<div class="proj-hours">'+(mins>0?toHours(mins):'—')+'</div>'
-      +'</div>';
+    let detailRows='';
+    if(linked.length===0){
+      detailRows='<p style="font-size:12px;color:var(--text-muted,#9C7A55);padding:8px 0;margin:0;">Nessuna sessione collegata a questo progetto.</p>';
+    } else {
+      detailRows='<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      linked.forEach(function(s){
+        detailRows+='<tr style="border-bottom:0.5px solid var(--surface2,#EAD9C0);">'
+          +'<td style="padding:5px 8px;color:var(--text-mid,#6B4C2A);">'+fmt(s.date)+'</td>'
+          +'<td style="padding:5px 8px;color:var(--text-mid,#6B4C2A);">'+(s.category||'—')+'</td>'
+          +'<td style="padding:5px 8px;color:var(--text-mid,#6B4C2A);">'+toHours(Number(s.minutes))+'</td>'
+          +'<td style="padding:5px 8px;color:var(--text-mid,#6B4C2A);">'+(s.note?s.note.slice(0,30)+(s.note.length>30?'…':''):'—')+'</td>'
+          +'<td style="padding:5px 8px;font-size:16px;">'+(s.mood||'')+'</td>'
+          +'</tr>';
+      });
+      detailRows+='</table>';
+    }
+    rows.push({name:p,mins:mins,count:linked.length,detailRows:detailRows,i:i});
   });
-  el.innerHTML=html;
+  el.innerHTML=rows.map(function(r){
+    return '<div style="border-bottom:0.5px solid var(--surface2,#EAD9C0);">'
+      +'<div class="proj-row" data-i="'+r.i+'" onclick="toggleProjDetail('+r.i+')">'
+      +'<div style="display:flex;align-items:center;gap:8px;">'
+      +'<span id="proj-chevron-'+r.i+'" class="proj-chevron">&#9654;</span>'
+      +'<div>'
+      +'<div style="font-size:13px;font-weight:500;color:var(--text,#2E1F0F);">'+r.name+'</div>'
+      +'<div class="proj-sessions">'+(r.count>0?r.count+' session'+(r.count===1?'e':'i')+' collegate':'nessuna sessione collegata ancora')+'</div>'
+      +'</div></div>'
+      +'<div class="proj-hours">'+(r.mins>0?toHours(r.mins):'—')+'</div>'
+      +'</div>'
+      +'<div id="proj-detail-'+r.i+'" class="proj-detail">'+r.detailRows+'</div>'
+      +'</div>';
+  }).join('');
+}
+function toggleProjDetail(detailId,chevronId){
+  const d=document.getElementById(detailId);
+  const c=document.getElementById(chevronId);
+  if(!d||!c) return;
+  d.classList.toggle('open');
+  c.classList.toggle('open');
 }
 function saveCategories(){
   localStorage.setItem('focus_categories',JSON.stringify(categories));
@@ -642,7 +681,7 @@ function renderTable(filtered){
   const tbody=document.getElementById('table-body');
   const reversed=[...filtered].reverse();
   const shown=tableLimit>0?reversed.slice(0,tableLimit):reversed;
-  if(reversed.length===0){tbody.innerHTML='<tr><td class="empty-cell" colspan="7">nessuna sessione in questo mese</td></tr>';return;}
+  if(reversed.length===0){tbody.innerHTML='<tr><td class="empty-cell" colspan="8">nessuna sessione in questo mese</td></tr>';return;}
   tbody.innerHTML=shown.map(s=>{
     const k=s.date;
     const noteSnippet=s.note?`<span style="display:block;font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;" title="${s.note.replace(/"/g,'&quot;')}">${s.note}</span>`:'';
@@ -653,6 +692,11 @@ function renderTable(filtered){
       <td style="color:var(--text-muted);font-size:12px;">${s.pomodori?s.pomodori+' × '+s.durata_pomodoro+' min':'—'}</td>
       <td style="max-width:160px;">${noteSnippet||'<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="font-size:18px;">${s.mood||moods[k]||''}</td>
+      <td style="font-size:11px;color:var(--text-muted);">${(()=>{
+        if(!s.projects||s.projects.length===0) return '—';
+        const arr=Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(x=>x.trim()).filter(Boolean);
+        return arr.length>0?arr.join(', '):'—';
+      })()}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-sm" onclick="openModal('${s.id}')" style="margin-right:4px;">modifica</button>
         <button class="btn btn-sm btn-danger" onclick="removeRow('${s.id}')">rimuovi</button>
