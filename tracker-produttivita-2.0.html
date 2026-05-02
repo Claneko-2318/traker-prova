@@ -390,10 +390,10 @@ tbody td{padding:8px 12px;color:var(--text);vertical-align:middle;}
       </div>
     </div>
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">sessioni</div><div class="stat-value" id="stat-total">—</div><div class="stat-sub" id="stat-time"></div></div>
-      <div class="stat-card"><div class="stat-label">media settimanale</div><div class="stat-value" id="stat-avg">—</div><div class="stat-sub">per settimana attiva</div></div>
+      <div class="stat-card"><div class="stat-label">sessioni totali</div><div class="stat-value" id="stat-total">—</div><div class="stat-sub" id="stat-time"></div></div>
       <div class="stat-card"><div class="stat-label">giorno top</div><div class="stat-value" id="stat-top-day">—</div><div class="stat-sub" id="stat-top-day-val"></div></div>
       <div class="stat-card"><div class="stat-label">streak attuale</div><div class="stat-value" id="stat-streak">—</div><div class="stat-sub">giorni consecutivi</div></div>
+      <div class="stat-card"><div class="stat-label">streak massimo mensile</div><div class="stat-value" id="stat-avg">—</div><div class="stat-sub">giorni consecutivi</div></div>
     </div>
     <div class="compare-row" id="compare-row"><span>—</span></div>
     <div class="section-label" style="margin-top:1.5rem;">medie per settimana</div>
@@ -658,6 +658,20 @@ function updatePreview(){const n=parseInt(document.getElementById('inp-pomodori'
 function changeMonth(dir){viewMonth+=dir;if(viewMonth>11){viewMonth=0;viewYear++;}if(viewMonth<0){viewMonth=11;viewYear--;}refresh();}
 function getPrefix(y,m){return y+'-'+String(m+1).padStart(2,'0');}
 function getFiltered(y,m){const p=getPrefix(y,m);return sessions.filter(s=>s.date.startsWith(p));}
+function calcMaxStreak(filtered){
+  const src=filtered||sessions;
+  const days=[...new Set(src.map(s=>s.date))].sort();
+  if(days.length===0) return 0;
+  let max=1,current=1;
+  for(let i=1;i<days.length;i++){
+    const prev=new Date(days[i-1]+'T12:00:00');
+    const curr=new Date(days[i]+'T12:00:00');
+    const diff=(curr-prev)/(1000*60*60*24);
+    if(diff===1){current++;max=Math.max(max,current);}
+    else{current=1;}
+  }
+  return max;
+}
 function calcStreak(){const days=new Set(sessions.map(s=>s.date));let streak=0;const d=new Date(todayStr+'T12:00:00');while(true){const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(!days.has(key))break;streak++;d.setDate(d.getDate()-1);}return streak;}
 
 function updateStats(filtered){
@@ -669,7 +683,7 @@ function updateStats(filtered){
   const isCurr=(viewYear===today2.getFullYear()&&viewMonth===today2.getMonth());
   const lastDay=isCurr?today2.getDate():new Date(viewYear,viewMonth+1,0).getDate();
   const wk=Math.ceil(lastDay/7);const avg=wk>0?Math.round(totalMin/wk):0;
-  document.getElementById('stat-avg').textContent=avg>0?toHours(avg):'—';
+  document.getElementById('stat-avg').textContent=calcMaxStreak(filtered);
   const byDay={};filtered.forEach(s=>{const d=s.date;byDay[d]=(byDay[d]||0)+Number(s.minutes);});
   const top=Object.entries(byDay).sort((a,b)=>b[1]-a[1])[0];
   document.getElementById('stat-top-day').textContent=top?fmt(top[0]):'—';
@@ -982,7 +996,7 @@ function exportPDF(){
   const stats=[
     ['Sessioni totali', filtered.length.toString()],
     ['Tempo totale', toHours(totalMin)],
-    ['Media settimanale',(()=>{const t2=new Date(todayStr+'T12:00:00');const isc=(viewYear===t2.getFullYear()&&viewMonth===t2.getMonth());const ld=isc?t2.getDate():new Date(viewYear,viewMonth+1,0).getDate();const wk=Math.ceil(ld/7);return wk>0?toHours(Math.round(totalMin/wk)):'—';})()],
+    ['Streak massimo', calcMaxStreak()+' giorni'],
     ['Streak attuale', calcStreak()+' giorni'],
     ['Giorno top',(()=>{const bd={};filtered.forEach(s=>{bd[s.date]=(bd[s.date]||0)+Number(s.minutes);});const t=Object.entries(bd).sort((a,b)=>b[1]-a[1])[0];return t?fmt(t[0])+' ('+toHours(t[1])+')':'—';})()],
   ];
