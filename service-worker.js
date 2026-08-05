@@ -1,6 +1,7 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v3-working-hoshi";
+const CACHE_NAME = "tracker-lavoro-cafe-v4-kurorei-tasks";
 const APP_SHELL = [
   "./working-tracker.html",
+  "./kurorei-chill.png",
   "./manifest.webmanifest",
   "./icons/favicon-32.png",
   "./icons/apple-touch-icon.png",

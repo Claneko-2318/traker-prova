@@ -781,6 +781,17 @@ tbody tr:last-child td{border-bottom:0}
 </select>
 </div>
 <div class="field" id="timer-field-pausa-custom" style="display:none;"><label>minuti pausa</label><input id="timer-pausa-custom" max="60" min="1" style="width:80px;" type="number"/></div>
+<div class="field"><label>pausa lunga</label>
+<select id="timer-pausa-lunga" onchange="document.getElementById('timer-field-pausa-lunga-custom').style.display=this.value==='custom'?'':'none'">
+<option value="15">15 minuti</option><option value="20" selected>20 minuti</option>
+<option value="25">25 minuti</option><option value="30">30 minuti</option>
+<option value="custom">personalizzata…</option>
+</select>
+</div>
+<div class="field" id="timer-field-pausa-lunga-custom" style="display:none;"><label>minuti pausa lunga</label><input id="timer-pausa-lunga-custom" max="120" min="1" style="width:90px;" type="number"/></div>
+<div class="field"><label>pausa lunga dopo</label>
+<select id="timer-pausa-lunga-ogni"><option value="2">2 pomodori</option><option value="3">3 pomodori</option><option value="4" selected>4 pomodori</option><option value="5">5 pomodori</option></select>
+</div>
 <button class="btn btn-primary" onclick="startTimer()">▶ inizia</button>
 </div>
 <div id="timer-running" style="display:none;text-align:center;padding:0.5rem 0;">
@@ -1459,13 +1470,18 @@ let timer=null;
 function saveTimerState(){if(timer)localStorage.setItem(TIMER_KEY,JSON.stringify(timer));else localStorage.removeItem(TIMER_KEY);}
 function timerDurataVal(){const v=document.getElementById('timer-durata').value;return v==='custom'?(parseInt(document.getElementById('timer-durata-custom').value)||0):parseInt(v);}
 function timerPausaVal(){const v=document.getElementById('timer-pausa').value;return v==='custom'?(parseInt(document.getElementById('timer-pausa-custom').value)||0):parseInt(v);}
+function timerPausaLungaVal(){const v=document.getElementById('timer-pausa-lunga').value;return v==='custom'?(parseInt(document.getElementById('timer-pausa-lunga-custom').value)||0):parseInt(v);}
 function startTimer(){
   const cat=document.getElementById('timer-cat').value;
   if(!cat){toast('Scegli prima la categoria!');return;}
+  const taskSel=document.getElementById('timer-task');
+  if(taskSel&&!taskSel.value){toast('Scegli una task collegata oppure “nessuna task”.');return;}
   const w=timerDurataVal();if(!w||w<1){toast('Durata pomodoro non valida.');return;}
   const b=timerPausaVal();if(isNaN(b)||b<0){toast('Pausa non valida.');return;}
+  const lb=timerPausaLungaVal();if(isNaN(lb)||lb<0){toast('Pausa lunga non valida.');return;}
+  const le=parseInt(document.getElementById('timer-pausa-lunga-ogni').value)||4;
   if('Notification' in window&&Notification.permission==='default'){try{Notification.requestPermission();}catch(e){}}
-  timer={phase:'work',endsAt:Date.now()+w*60000,pausedRemaining:null,workMin:w,breakMin:b,completed:0,category:cat};
+  timer={phase:'work',endsAt:Date.now()+w*60000,pausedRemaining:null,workMin:w,breakMin:b,longBreakMin:lb,longBreakEvery:le,completed:0,category:cat,taskId:taskSel&&taskSel.value!=='__none__'?taskSel.value:''};
   saveTimerState();renderTimer();startTick();
 }
 function startTick(){stopTick();window._timerInt=setInterval(tickTimer,500);}
@@ -1481,8 +1497,10 @@ function advancePhases(notify){
     guard++;
     if(timer.phase==='work'){
       timer.completed++;
-      if(notify)notifyPhase('🍅 Pomodoro '+timer.completed+' completato!',timer.breakMin>0?'Pausa di '+timer.breakMin+' min ☕':'Si riparte subito!');
-      if(timer.breakMin>0){timer.phase='break';timer.endsAt+=timer.breakMin*60000;}
+      const useLong=timer.longBreakMin>0&&timer.longBreakEvery>0&&timer.completed%timer.longBreakEvery===0;
+      const nextBreak=useLong?timer.longBreakMin:timer.breakMin;
+      if(notify)notifyPhase('🍅 Pomodoro '+timer.completed+' completato!',nextBreak>0?(useLong?'Pausa lunga di ':'Pausa di ')+nextBreak+' min ☕':'Si riparte subito!');
+      if(nextBreak>0){timer.phase=useLong?'long-break':'break';timer.endsAt+=nextBreak*60000;}
       else{timer.endsAt+=timer.workMin*60000;}
     } else {
       if(notify)notifyPhase('☕ Pausa finita!','Si riparte: pomodoro '+(timer.completed+1));
@@ -1502,7 +1520,7 @@ function notifyPhase(title,body){
     g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.9);
     o.start();o.stop(ctx.currentTime+0.95);
   }catch(e){}
-  try{if('Notification' in window&&Notification.permission==='granted')new Notification(title,{body:body});}catch(e){}
+  try{if('Notification' in window&&Notification.permission==='granted'){if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,{body:body,icon:'icons/icon-192.png',badge:'icons/favicon-32.png',tag:'tracker-timer'})).catch(()=>{try{new Notification(title,{body:body})}catch(e){}});else new Notification(title,{body:body});}}catch(e){}
   toast(title);
 }
 function pauseResumeTimer(){
@@ -1518,7 +1536,7 @@ function pauseResumeTimer(){
   saveTimerState();renderTimerCountdown();
 }
 function skipBreak(){
-  if(!timer||timer.phase!=='break')return;
+  if(!timer||(timer.phase!=='break'&&timer.phase!=='long-break'))return;
   timer.phase='work';timer.pausedRemaining=null;timer.endsAt=Date.now()+timer.workMin*60000;
   document.getElementById('timer-btn-pause').innerHTML='⏸ pausa';
   saveTimerState();renderTimer();
@@ -1553,10 +1571,10 @@ function renderTimer(){
   if(!timer)return;
   document.getElementById('timer-setup').style.display='none';
   document.getElementById('timer-running').style.display='';
-  const lbl=timer.phase==='work'?('pomodoro '+(timer.completed+1)+' · '+timer.category):('pausa ☕ · '+timer.category);
+  const lbl=timer.phase==='work'?('pomodoro '+(timer.completed+1)+' · '+timer.category):(timer.phase==='long-break'?'pausa lunga ☕ · ':'pausa ☕ · ')+timer.category;
   document.getElementById('timer-phase-label').textContent=lbl;
   document.getElementById('timer-tomatoes').textContent='🍅'.repeat(Math.min(timer.completed,30));
-  document.getElementById('timer-btn-skip').style.display=timer.phase==='break'?'':'none';
+  document.getElementById('timer-btn-skip').style.display=(timer.phase==='break'||timer.phase==='long-break')?'':'none';
   document.getElementById('timer-btn-pause').innerHTML=timer.pausedRemaining!=null?'▶ riprendi':'⏸ pausa';
   renderTimerCountdown();
 }
@@ -1831,6 +1849,7 @@ function downloadBackup(){const blob=new Blob([JSON.stringify(buildBackup(),null
 async function restoreBackupFile(input){
   const file=input.files&&input.files[0];input.value='';if(!file)return;let backup;try{backup=JSON.parse(await file.text());}catch(err){toast('Il file di backup non è valido.');return;}
   if(!backup||backup.format!=='tracker-produttivita-backup'||!Array.isArray(backup.sessions)){toast('Questo file non è un backup del tracker.');return;}
+  if(window.importWorkDashboardBackup)window.importWorkDashboardBackup(backup);
   if(!confirm('Ripristinare questo backup?\n\nCategorie, progetti e impostazioni locali verranno aggiornati. Le sessioni già presenti non saranno duplicate.'))return;
   const status=document.getElementById('backup-status');status.textContent='Ripristino in corso…';categories=Array.isArray(backup.categories)?backup.categories:[];projects=normProjects(Array.isArray(backup.projects)?backup.projects:[]);moods=backup.moods&&typeof backup.moods==='object'?backup.moods:{};localStorage.setItem('focus_categories',JSON.stringify(categories));localStorage.setItem('focus_projects',JSON.stringify(projects));localStorage.setItem('focus_moods',JSON.stringify(moods));
   if(backup.settings){if(backup.settings.scriptUrl){SCRIPT_URL=backup.settings.scriptUrl;localStorage.setItem('focus_script_url',SCRIPT_URL);document.getElementById('script-url').value=SCRIPT_URL;}if(['pom','time'].includes(backup.settings.currentMode))setMode(backup.settings.currentMode);if([0,5,10].includes(Number(backup.settings.tableLimit)))tableLimit=Number(backup.settings.tableLimit);}
@@ -2043,6 +2062,115 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   }
   updateCafeClock();
   setInterval(updateCafeClock,1000);
+})();
+</script>
+<style>
+/* Dashboard operativa 2026 */
+:root{--hero-h:380px}
+.topbar{background-image:url('kurorei-chill.png');background-position:center 25%;background-size:cover}
+.topbar-title{display:none}
+.home-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.75fr);gap:20px}
+.home-stack{display:flex;flex-direction:column;gap:20px}
+.home-head{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;margin-bottom:18px}
+.home-head h1{margin:0;color:var(--espresso);font:500 27px 'Lora',serif}
+.home-head p{margin:4px 0 0;color:var(--muted)}
+.home-actions{display:flex;gap:8px;flex-wrap:wrap}
+.home-card{padding:20px;border:1px solid var(--line);border-radius:20px;background:rgba(255,253,248,.92);box-shadow:var(--shadow-soft)}
+.home-card-head{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.home-card-head h2{margin:0;font:italic 18px 'Lora',serif}
+.home-card-head .home-card-action{margin-left:auto;border:0;background:transparent;color:var(--coffee);font-size:12px}
+.home-task{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;padding:13px 2px;border-bottom:1px solid rgba(226,207,186,.7)}
+.home-task:last-child{border-bottom:0}.home-task-check{width:20px;height:20px;border:1px solid var(--caramel);border-radius:50%;background:#fff}
+.home-task-title{font-weight:500}.home-task-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}.home-chip{display:inline-flex;align-items:center;padding:3px 7px;border-radius:20px;background:var(--paper-deep);color:var(--ink-soft);font-size:10px}.home-chip.link{border:1px solid var(--line);background:#fff;color:var(--coffee);text-decoration:none}.home-task-time{color:var(--muted);white-space:nowrap}.home-empty{padding:25px;text-align:center;color:var(--muted);font-style:italic}
+.home-progress{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-top:15px}.home-bar{height:6px;border-radius:9px;background:var(--paper-deep);overflow:hidden}.home-bar i{display:block;height:100%;background:var(--caramel)}
+#home-timer-slot #timer-card{margin:0!important;background:var(--espresso);border-color:var(--espresso)}
+#home-timer-slot #timer-setup{flex-direction:column;align-items:stretch!important}#home-timer-slot #timer-setup .field{width:100%}#home-timer-slot #timer-setup select,#home-timer-slot #timer-setup input{width:100%!important}
+#page-insert>.section-label:first-child{display:none}
+.home-notes textarea{width:100%;min-height:78px;margin-top:12px;border:0;outline:0;resize:vertical;background:#fff6df;border-radius:12px;padding:12px;color:var(--ink)}
+.home-note-actions{display:flex;justify-content:flex-end;margin-top:8px}.home-note-list{margin-top:8px}.home-note{padding:10px 0;border-bottom:1px solid var(--line)}.home-note:last-child{border:0}.home-note small{color:var(--muted)}
+.home-overview{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.home-stat{text-align:center;min-height:132px;padding:17px;border:1px solid var(--line);border-radius:17px;background:rgba(255,253,248,.9)}.home-stat-icon{display:block;color:var(--caramel);font-size:35px;line-height:1}.home-stat strong{display:block;margin:8px 0 3px;color:var(--espresso);font:500 25px 'Lora',serif}.home-stat span:last-child{color:var(--muted);font-size:11px}
+.task-editor{position:fixed;inset:0;z-index:150;display:grid;place-items:center;padding:20px;background:rgba(48,28,18,.54)}.task-editor.hidden{display:none}.task-editor-box{width:min(620px,100%);max-height:90vh;overflow:auto;padding:22px;border-radius:20px;background:var(--paper);box-shadow:0 25px 70px rgba(35,19,12,.32)}.task-editor-box h2{margin:0 0 15px;font:500 21px 'Lora',serif}.task-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.task-editor-grid .full{grid-column:1/-1}.task-editor-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+@media(max-width:1050px){.home-grid{grid-template-columns:1fr}.home-stack{display:grid;grid-template-columns:1fr 1fr}.home-overview{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){:root{--hero-h:280px}.topbar{background-position:center 25%}.home-stack{display:flex}.home-overview{grid-template-columns:1fr}.task-editor-grid{grid-template-columns:1fr}.task-editor-grid .full{grid-column:auto}}
+@media(max-width:480px){:root{--hero-h:220px}.topbar{background-position:center 22%}.home-head{align-items:flex-start;flex-direction:column}}
+</style>
+<script>
+(function initWorkDashboard(){
+  const TASK_KEY='focus_work_tasks_v1',NOTE_KEY='focus_quick_notes_v1';
+  let workTasks=[];let quickNotes=[];
+  try{workTasks=JSON.parse(localStorage.getItem(TASK_KEY)||'[]');if(!Array.isArray(workTasks))workTasks=[];}catch(e){workTasks=[]}
+  try{quickNotes=JSON.parse(localStorage.getItem(NOTE_KEY)||'[]');if(!Array.isArray(quickNotes))quickNotes=[];}catch(e){quickNotes=[]}
+  const nav=document.querySelector('.icon-sidebar');
+  const firstNav=nav.querySelector('.nav-icon[data-page]');
+  const homeNav=document.createElement('div');homeNav.className='nav-icon active';homeNav.dataset.page='home';homeNav.title='Dashboard';homeNav.innerHTML='<svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="20"><path d="M3 11l9-8 9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg><span class="nav-label">Dashboard</span>';homeNav.onclick=()=>showPage('home');nav.insertBefore(homeNav,firstNav);firstNav.classList.remove('active');firstNav.querySelector('.nav-label').textContent='Sessioni';
+  const mainBox=document.querySelector('.main-box');
+  const home=document.createElement('div');home.className='page-section active';home.id='page-home';home.innerHTML='<div class="home-head"><div><h1>Dashboard</h1><p>Una vista leggera su ciò che conta oggi.</p></div><div class="home-actions"><button class="btn" type="button" onclick="showPage(\'insert\')">Registra sessione</button><button class="btn btn-primary" type="button" id="home-new-task">+ Nuova attività</button></div></div><div class="home-grid"><section><div class="home-card"><div class="home-card-head"><span>☕</span><h2>Piano di oggi</h2><button class="home-card-action" id="home-new-task-inline">Aggiungi attività +</button></div><div id="home-task-list"></div><div class="home-progress"><span id="home-progress-label">0 attività</span><div class="home-bar"><i id="home-progress-bar" style="width:0"></i></div><b id="home-progress-pct">0%</b></div></div><div class="home-overview"><div class="home-stat"><span class="home-stat-icon">◷</span><strong id="home-today-time">—</strong><span>lavoro oggi</span></div><div class="home-stat"><span class="home-stat-icon">✓</span><strong id="home-done-count">0</strong><span>attività completate</span></div><div class="home-stat"><span class="home-stat-icon">◎</span><strong id="home-session-count">0</strong><span>sessioni oggi</span></div></div></section><aside class="home-stack"><div class="home-card"><div class="home-card-head"><span>☕</span><h2>Sessione di lavoro</h2></div><div id="home-timer-slot"></div></div><div class="home-card home-notes"><div class="home-card-head"><span>✎</span><h2>Note rapide</h2></div><textarea id="home-note-input" placeholder="Scrivi qualcosa da ricordare…"></textarea><div class="home-note-actions"><button class="btn btn-sm" id="home-save-note">Salva nota</button></div><div class="home-note-list" id="home-note-list"></div></div></aside></div>';
+  mainBox.insertBefore(home,mainBox.firstChild);document.getElementById('page-insert').classList.remove('active');
+  const editor=document.createElement('div');editor.className='task-editor hidden';editor.id='task-editor';editor.innerHTML='<form class="task-editor-box" id="task-editor-form"><h2>Nuova attività</h2><input id="task-id" type="hidden"><div class="task-editor-grid"><div class="field full"><label>attività</label><input id="task-title" required placeholder="Cosa devi fare?"></div><div class="field"><label>progetto</label><select id="task-project"><option value="">— nessun progetto —</option></select></div><div class="field"><label>scadenza</label><input id="task-due" type="date"></div><div class="field"><label>durata prevista</label><input id="task-duration" placeholder="es. 1h 30m"></div><div class="field"><label>priorità</label><select id="task-priority"><option value="media">Media</option><option value="alta">Alta</option><option value="bassa">Bassa</option></select></div><div class="field full"><label>link VGen</label><input id="task-vgen" type="url" placeholder="https://…"></div><div class="field full"><label>link Notion</label><input id="task-notion" type="url" placeholder="https://…"></div><div class="field full"><label>link Drive o cartella</label><input id="task-drive" type="url" placeholder="https://…"></div></div><div class="task-editor-actions"><button class="btn" type="button" id="task-editor-cancel">Annulla</button><button class="btn btn-primary" type="submit">Salva attività</button></div></form>';document.body.appendChild(editor);
+  const timerCard=document.getElementById('timer-card');document.getElementById('home-timer-slot').appendChild(timerCard);
+  function safeUrl(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
+  function saveTasks(){localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions()}
+  function openEditor(task){const t=task||{};document.getElementById('task-id').value=t.id||'';document.getElementById('task-title').value=t.title||'';document.getElementById('task-due').value=t.due||'';document.getElementById('task-duration').value=t.duration||'';document.getElementById('task-priority').value=t.priority||'media';document.getElementById('task-vgen').value=t.links?.vgen||'';document.getElementById('task-notion').value=t.links?.notion||'';document.getElementById('task-drive').value=t.links?.drive||'';const sel=document.getElementById('task-project');sel.innerHTML='<option value="">— nessun progetto —</option>'+projects.filter(p=>!p.archived).map(p=>'<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>').join('');sel.value=t.project||'';editor.classList.remove('hidden');if(window.populateGenericLinks)window.populateGenericLinks(t);document.getElementById('task-title').focus()}
+  function closeEditor(){editor.classList.add('hidden');document.getElementById('task-editor-form').reset()}
+  function renderTasks(){const list=document.getElementById('home-task-list');const today=new Date().toISOString().slice(0,10);const visible=workTasks.filter(t=>!t.done).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).slice(0,6);if(!visible.length)list.innerHTML='<div class="home-empty">Nessuna attività aperta. Aggiungine una quando vuoi.</div>';else list.innerHTML=visible.map(t=>{const links=t.links||{};const linkHtml=[['VGen',links.vgen],['Notion',links.notion],['Drive',links.drive]].filter(x=>safeUrl(x[1])).map(x=>'<a class="home-chip link" href="'+esc(safeUrl(x[1]))+'" target="_blank" rel="noopener">'+x[0]+' ↗</a>').join('');return '<div class="home-task"><button class="home-task-check" data-done="'+esc(t.id)+'" title="Completa"></button><div><div class="home-task-title" data-edit="'+esc(t.id)+'">'+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+(t.priority==='alta'?'<span class="home-chip" style="color:var(--danger)">priorità alta</span>':'')+linkHtml+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span></div>'}).join('');list.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{const t=workTasks.find(x=>x.id===b.dataset.done);if(t){t.done=true;t.completedAt=new Date().toISOString();saveTasks()}});list.querySelectorAll('[data-edit]').forEach(e=>e.onclick=()=>openEditor(workTasks.find(x=>x.id===e.dataset.edit)));const done=workTasks.filter(t=>t.done).length,total=workTasks.length,pct=total?Math.round(done/total*100):0;document.getElementById('home-progress-label').textContent=done+' su '+total+' completate';document.getElementById('home-progress-bar').style.width=pct+'%';document.getElementById('home-progress-pct').textContent=pct+'%';document.getElementById('home-done-count').textContent=done}
+  function renderNotes(){const el=document.getElementById('home-note-list');el.innerHTML=quickNotes.slice(0,3).map(n=>'<div class="home-note">'+esc(n.text)+'<br><small>'+new Date(n.at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</small></div>').join('')}
+  function renderHomeStats(){const today=new Date().toISOString().slice(0,10),todaySessions=sessions.filter(s=>s.date===today),mins=todaySessions.reduce((a,s)=>a+Number(s.minutes||0),0);document.getElementById('home-today-time').textContent=mins?toHours(mins):'—';document.getElementById('home-session-count').textContent=todaySessions.length}
+  document.getElementById('home-new-task').onclick=()=>openEditor();document.getElementById('home-new-task-inline').onclick=()=>openEditor();document.getElementById('task-editor-cancel').onclick=closeEditor;editor.onclick=e=>{if(e.target===editor)closeEditor()};document.getElementById('task-editor-form').onsubmit=e=>{e.preventDefault();const id=document.getElementById('task-id').value||String(Date.now());const old=workTasks.find(t=>t.id===id);const task={id,title:document.getElementById('task-title').value.trim(),project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links:{vgen:document.getElementById('task-vgen').value.trim(),notion:document.getElementById('task-notion').value.trim(),drive:document.getElementById('task-drive').value.trim()},done:old?.done||false,createdAt:old?.createdAt||new Date().toISOString()};if(old)Object.assign(old,task);else workTasks.unshift(task);saveTasks();closeEditor()};document.getElementById('home-save-note').onclick=()=>{const input=document.getElementById('home-note-input'),text=input.value.trim();if(!text)return;quickNotes.unshift({text,at:new Date().toISOString()});quickNotes=quickNotes.slice(0,20);localStorage.setItem(NOTE_KEY,JSON.stringify(quickNotes));input.value='';renderNotes()};
+  const originalRefresh=window.refresh;window.refresh=function(){originalRefresh();renderHomeStats()};
+  const originalBuildBackup=window.buildBackup;window.buildBackup=function(){const b=originalBuildBackup();b.tasks=workTasks;b.quickNotes=quickNotes;b.timerPreferences={longBreak:document.getElementById('timer-pausa-lunga').value,longBreakEvery:document.getElementById('timer-pausa-lunga-ogni').value};return b};
+  window.importWorkDashboardBackup=function(backup){if(Array.isArray(backup.tasks)){workTasks=backup.tasks;localStorage.setItem(TASK_KEY,JSON.stringify(workTasks))}if(Array.isArray(backup.quickNotes)){quickNotes=backup.quickNotes;localStorage.setItem(NOTE_KEY,JSON.stringify(quickNotes))}if(backup.timerPreferences){const lb=document.getElementById('timer-pausa-lunga'),le=document.getElementById('timer-pausa-lunga-ogni');if(lb&&backup.timerPreferences.longBreak)lb.value=backup.timerPreferences.longBreak;if(le&&backup.timerPreferences.longBreakEvery)le.value=backup.timerPreferences.longBreakEvery}renderTasks();renderNotes()};
+  window.getWorkDashboardTasks=function(){return workTasks.slice()};
+  window.workTaskApi={list:function(){return workTasks},save:saveTasks,open:openEditor,close:closeEditor};
+  renderTasks();renderNotes();renderHomeStats();showPage('home');
+})();
+</script>
+<style>
+/* Header scorrevole e pagina progetti a schede */
+.topbar{position:relative;top:auto;right:auto;left:auto;width:auto;height:var(--hero-h);margin-left:var(--sidebar-w);background-position:center 25%}
+.main{margin-left:var(--sidebar-w);padding:28px 34px 52px}
+.project-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.project-preview-card{padding:18px;border:1px solid var(--line);border-radius:18px;background:rgba(255,253,248,.92);box-shadow:var(--shadow-soft)}
+.project-preview-head{display:flex;align-items:center;gap:10px}.project-preview-icon{width:38px;height:38px;border-radius:12px;background:var(--paper-deep);display:grid;place-items:center;font-size:19px}.project-preview-head strong{flex:1;font:500 16px 'Lora',serif}
+.project-preview-meta{margin:7px 0 11px;color:var(--muted);font-size:11px}.project-preview-links{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}.project-preview-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:13px;padding-top:11px;border-top:1px solid var(--line)}
+.project-preview-details{margin-top:12px}.project-preview-details summary{cursor:pointer;color:var(--coffee);font-size:12px}.project-preview-session{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:11px}
+#page-projects>.card,#proj-archived-section>.card{padding:0;border:0;background:transparent;box-shadow:none;opacity:1!important}
+.project-create-bar{display:flex;align-items:flex-end;gap:10px;margin-bottom:18px;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(255,253,248,.9);box-shadow:var(--shadow-soft)}.project-create-bar .field{flex:1;margin:0}.project-create-bar input{width:100%}
+@media(max-width:760px){.topbar{margin-left:0}.main{margin-left:0;padding:18px 14px 95px}.project-preview-grid{grid-template-columns:1fr}}
+</style>
+<script>
+(function installProjectCards(){
+  const projectPage=document.getElementById('page-projects');
+  if(projectPage&&!document.getElementById('project-page-create')){const createBar=document.createElement('div');createBar.className='project-create-bar';createBar.id='project-page-create';createBar.innerHTML='<div class="field"><label>nuovo progetto</label><input id="project-page-name" placeholder="es. Commissione, progetto editoriale…"></div><button class="btn btn-primary" id="project-page-add">+ aggiungi progetto</button>';projectPage.insertBefore(createBar,projectPage.querySelector('.card'));const addFromProjectPage=()=>{const input=document.getElementById('project-page-name'),name=input.value.trim();if(!name)return;if(name.includes('|')){toast('Il carattere | non è consentito nel nome.');return}if(projects.some(p=>p.name===name)){toast('Progetto già presente.');return}projects.push({name,fee:'',archived:false});saveProjects();renderProjects();renderProjectsPage();input.value='';toast('Progetto aggiunto!')};document.getElementById('project-page-add').onclick=addFromProjectPage;document.getElementById('project-page-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addFromProjectPage()}}}
+  function validLink(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
+  window.renderProjectsPage=function(){
+    const elA=document.getElementById('proj-page-active'),elArch=document.getElementById('proj-page-archived'),secArch=document.getElementById('proj-archived-section');if(!elA)return;
+    const tasks=window.getWorkDashboardTasks?window.getWorkDashboardTasks():[];
+    function card(p,i){const linked=getLinkedSessions(p.name),mins=linked.reduce((a,s)=>a+Number(s.minutes||0),0),pt=tasks.filter(t=>t.project===p.name),done=pt.filter(t=>t.done).length,pct=pt.length?Math.round(done/pt.length*100):0,urls={};pt.forEach(t=>Object.entries(t.links||{}).forEach(([k,v])=>{if(validLink(v)&&!urls[k])urls[k]=validLink(v)}));const labels={vgen:'VGen',notion:'Notion',drive:'Drive'},links=Object.entries(urls).map(([k,v])=>'<a class="home-chip link" href="'+esc(v)+'" target="_blank" rel="noopener">'+(labels[k]||k)+' ↗</a>').join('');const rows=linked.slice(0,6).map(s=>'<div class="project-preview-session"><span>'+fmt(s.date)+'</span><span>'+esc(s.category||'Sessione')+'</span><b>'+toHours(Number(s.minutes||0))+'</b></div>').join('');return '<article class="project-preview-card"><div class="project-preview-head"><span class="project-preview-icon">'+(p.archived?'🗄':'▱')+'</span><strong>'+esc(p.name)+'</strong><span>'+pct+'%</span></div><div class="project-preview-meta">'+pt.filter(t=>!t.done).length+' attività aperte · '+(mins?toHours(mins)+' lavorate':'nessuna sessione')+'</div><div class="home-bar"><i style="width:'+pct+'%"></i></div><div class="project-preview-links">'+(links||'<span class="home-chip">nessun link esterno</span>')+'</div><details class="project-preview-details"><summary>Sessioni collegate ('+linked.length+')</summary>'+(rows||'<div class="home-empty">Nessuna sessione collegata.</div>')+'</details><div class="project-preview-actions"><button class="btn btn-sm" onclick="toggleProjArchive('+i+')">'+(p.archived?'↩ ripristina':'archivia')+'</button></div></article>'}
+    const active=projects.map((p,i)=>({p,i})).filter(x=>!x.p.archived),archived=projects.map((p,i)=>({p,i})).filter(x=>x.p.archived);elA.className='project-preview-grid';elA.innerHTML=active.length?active.map(x=>card(x.p,x.i)).join(''):'<div class="home-empty">Nessun progetto attivo.</div>';if(archived.length){secArch.style.display='';elArch.className='project-preview-grid';elArch.innerHTML=archived.map(x=>card(x.p,x.i)).join('')}else secArch.style.display='none';
+  };
+  renderProjectsPage();
+})();
+</script>
+<style>
+.completed-toggle{margin-left:auto;border:1px solid var(--line);background:var(--paper);color:var(--coffee);padding:6px 9px;border-radius:10px;font-size:10px}.completed-toggle.active{background:var(--paper-deep)}.home-completed-label{margin-top:14px;padding:9px 2px 4px;color:var(--muted);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.09em}.home-task{grid-template-columns:22px minmax(0,1fr) auto 30px}.home-task.is-complete{opacity:.68}.home-task.is-complete .home-task-title{text-decoration:line-through}.home-task-delete{width:28px;height:28px;padding:0;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--muted);font-size:17px}.home-task-delete:hover{border-color:var(--line);background:#fff;color:var(--danger)}.generic-links{grid-column:1/-1;padding-top:4px;border-top:1px solid var(--line)}.generic-links-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.generic-link-row{display:grid;grid-template-columns:minmax(100px,.42fr) 1fr auto;gap:7px;margin-top:7px}.generic-link-remove{width:38px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--danger)}.timer-task-field{display:flex;gap:7px;align-items:flex-end}.timer-task-field .field{flex:1}
+@media(max-width:600px){.generic-link-row{grid-template-columns:1fr}.generic-link-remove{width:100%}}
+</style>
+<script>
+(function enhanceTasksAndTimer(){
+  const api=window.workTaskApi;if(!api)return;let showCompleted=false;
+  ['task-vgen','task-notion','task-drive'].forEach(id=>{const el=document.getElementById(id);if(el&&el.closest('.field'))el.closest('.field').style.display='none'});
+  const editorGrid=document.querySelector('#task-editor-form .task-editor-grid');const generic=document.createElement('div');generic.className='generic-links';generic.innerHTML='<div class="generic-links-head"><label>link esterni</label><button class="btn btn-sm" type="button" id="generic-link-add">+ aggiungi link</button></div><div id="generic-link-list"></div>';editorGrid.appendChild(generic);
+  function addLinkRow(label='',url=''){const row=document.createElement('div');row.className='generic-link-row';row.innerHTML='<input class="generic-link-label" placeholder="Nome link, es. Brief"><input class="generic-link-url" type="url" placeholder="https://…"><button class="generic-link-remove" type="button">×</button>';row.querySelector('.generic-link-label').value=label;row.querySelector('.generic-link-url').value=url;row.querySelector('.generic-link-remove').onclick=()=>row.remove();document.getElementById('generic-link-list').appendChild(row)}
+  document.getElementById('generic-link-add').onclick=()=>addLinkRow();
+  window.populateGenericLinks=function(task){const list=document.getElementById('generic-link-list');list.innerHTML='';const links=task&&task.links?task.links:{};if(Array.isArray(links))links.forEach(l=>addLinkRow(l.label||'',l.url||''));else Object.entries(links).filter(([,u])=>u).forEach(([label,url])=>addLinkRow(label.charAt(0).toUpperCase()+label.slice(1),url));if(!list.children.length)addLinkRow()};
+  function safeUrl(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
+  function linkEntries(task){const links=task.links||{};return Array.isArray(links)?links.map(l=>[l.label,l.url]):Object.entries(links)}
+  const head=document.querySelector('#page-home .home-card-head');const toggle=document.createElement('button');toggle.className='completed-toggle';toggle.type='button';toggle.textContent='Mostra completate';head.insertBefore(toggle,document.getElementById('home-new-task-inline'));toggle.onclick=()=>{showCompleted=!showCompleted;toggle.classList.toggle('active',showCompleted);toggle.textContent=showCompleted?'Nascondi completate':'Mostra completate';window.renderWorkTasksGeneric(api.list())};
+  window.renderWorkTasksGeneric=function(tasks){const list=document.getElementById('home-task-list'),today=new Date().toISOString().slice(0,10),active=tasks.filter(t=>!t.done).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).slice(0,8),completed=showCompleted?tasks.filter(t=>t.done).sort((a,b)=>(b.completedAt||'').localeCompare(a.completedAt||'')).slice(0,12):[];function row(t){const links=linkEntries(t).map(([label,url])=>[String(label||'Link'),safeUrl(url)]).filter(x=>x[1]).map(x=>'<a class="home-chip link" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join('');return '<div class="home-task'+(t.done?' is-complete':'')+'"><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+links+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>'}list.innerHTML=active.length?active.map(row).join(''):'<div class="home-empty">Nessuna attività aperta.</div>';if(completed.length)list.innerHTML+='<div class="home-completed-label">Completate</div>'+completed.map(row).join('');list.querySelectorAll('[data-toggle-task]').forEach(b=>b.onclick=()=>{const t=api.list().find(x=>x.id===b.dataset.toggleTask);if(t){t.done=!t.done;t.completedAt=t.done?new Date().toISOString():'';api.save()}});list.querySelectorAll('[data-edit-task]').forEach(e=>e.onclick=()=>api.open(api.list().find(x=>x.id===e.dataset.editTask)));list.querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=()=>{const tasks=api.list(),index=tasks.findIndex(t=>t.id===b.dataset.deleteTask);if(index<0)return;const task=tasks[index];if(!confirm('Eliminare definitivamente l’attività “'+task.title+'”?'))return;tasks.splice(index,1);api.save();toast('Attività eliminata.')});const done=tasks.filter(t=>t.done).length,total=tasks.length,pct=total?Math.round(done/total*100):0;document.getElementById('home-progress-label').textContent=done+' su '+total+' completate';document.getElementById('home-progress-bar').style.width=pct+'%';document.getElementById('home-progress-pct').textContent=pct+'%';document.getElementById('home-done-count').textContent=done};
+  document.getElementById('task-editor-form').onsubmit=e=>{e.preventDefault();const id=document.getElementById('task-id').value||String(Date.now()),tasks=api.list(),old=tasks.find(t=>t.id===id),links={};document.querySelectorAll('.generic-link-row').forEach((row,index)=>{const label=row.querySelector('.generic-link-label').value.trim()||('Link '+(index+1)),url=row.querySelector('.generic-link-url').value.trim();if(safeUrl(url)){let key=label,n=2;while(links[key])key=label+' '+n++;links[key]=safeUrl(url)}});const task={id,title:document.getElementById('task-title').value.trim(),project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links,done:old?.done||false,completedAt:old?.completedAt||'',createdAt:old?.createdAt||new Date().toISOString()};if(!task.title)return;if(old)Object.assign(old,task);else tasks.unshift(task);api.save();api.close()};
+  const timerSetup=document.getElementById('timer-setup'),catField=document.getElementById('timer-cat').closest('.field'),taskWrap=document.createElement('div');taskWrap.className='timer-task-field';taskWrap.innerHTML='<div class="field"><label>task collegata</label><select id="timer-task"></select></div><button class="btn" type="button" id="timer-new-task">+ task</button>';catField.insertAdjacentElement('afterend',taskWrap);document.getElementById('timer-new-task').onclick=()=>api.open();
+  window.refreshTimerTaskOptions=function(){const sel=document.getElementById('timer-task');if(!sel)return;const prev=sel.value;sel.innerHTML='<option value="">— scegli o aggiungi —</option><option value="__none__">nessuna task</option>'+api.list().filter(t=>!t.done).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>').join('');if([...sel.options].some(o=>o.value===prev))sel.value=prev};
+  window.refreshTimerTaskOptions();window.renderWorkTasksGeneric(api.list());
 })();
 </script>
 <script>
