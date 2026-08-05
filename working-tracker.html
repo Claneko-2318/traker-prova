@@ -1723,7 +1723,7 @@ async function saveEdit(){
 
 async function api(params){
   if(!SCRIPT_URL){toast('Configura prima l\'URL!');return null;}
-  try{const isGet=params.action==='get';const res=await fetch(isGet?SCRIPT_URL+'?action=get':SCRIPT_URL,isGet?{method:'GET'}:{method:'POST',body:JSON.stringify(params)});return await res.json();}
+  try{const isGet=params.action==='get';const getUrl=SCRIPT_URL+'?action=get&_ts='+Date.now();const res=await fetch(isGet?getUrl:SCRIPT_URL,isGet?{method:'GET',cache:'no-store'}:{method:'POST',body:JSON.stringify(params)});return await res.json();}
   catch(err){toast('Errore di connessione.');setStatus('Errore di connessione','err');return null;}
 }
 
@@ -1771,6 +1771,20 @@ async function loadSessions(){
     } else {
       categories=JSON.parse(localStorage.getItem('focus_categories')||'[]');
       renderCategories();
+    }
+    // task condivise: Sheets e' la fonte comune tra PC e cellulare.
+    // Se il backend non e' ancora aggiornato, resta attivo il fallback locale.
+    if(Array.isArray(data.tasks)){
+      let localTasks=[];
+      try{localTasks=JSON.parse(localStorage.getItem('focus_work_tasks_v1')||'[]');if(!Array.isArray(localTasks))localTasks=[];}catch(e){localTasks=[];}
+      if(data.tasks.length||!localTasks.length){
+        localStorage.setItem('focus_work_tasks_v1',JSON.stringify(data.tasks));
+        if(window.replaceWorkTasks)window.replaceWorkTasks(data.tasks);
+      }else{
+        // Prima migrazione: il foglio e' vuoto ma questo dispositivo ha gia' task.
+        // Caricale su Sheets senza cancellare la copia locale.
+        api({action:'saveTasks',tasks:localTasks}).then(r=>{if(r&&r.ok)toast('Task locali sincronizzate con Google Sheets.')});
+      }
     }
     // umore
     if(data.moods&&Object.keys(data.moods).length>0){
@@ -2109,7 +2123,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   const editor=document.createElement('div');editor.className='task-editor hidden';editor.id='task-editor';editor.innerHTML='<form class="task-editor-box" id="task-editor-form"><h2>Nuova attività</h2><input id="task-id" type="hidden"><div class="task-editor-grid"><div class="field full"><label>attività</label><input id="task-title" required placeholder="Cosa devi fare?"></div><div class="field"><label>progetto</label><select id="task-project"><option value="">— nessun progetto —</option></select></div><div class="field"><label>scadenza</label><input id="task-due" type="date"></div><div class="field"><label>durata prevista</label><input id="task-duration" placeholder="es. 1h 30m"></div><div class="field"><label>priorità</label><select id="task-priority"><option value="media">Media</option><option value="alta">Alta</option><option value="bassa">Bassa</option></select></div><div class="field full"><label>link VGen</label><input id="task-vgen" type="url" placeholder="https://…"></div><div class="field full"><label>link Notion</label><input id="task-notion" type="url" placeholder="https://…"></div><div class="field full"><label>link Drive o cartella</label><input id="task-drive" type="url" placeholder="https://…"></div></div><div class="task-editor-actions"><button class="btn" type="button" id="task-editor-cancel">Annulla</button><button class="btn btn-primary" type="submit">Salva attività</button></div></form>';document.body.appendChild(editor);
   const timerCard=document.getElementById('timer-card');document.getElementById('home-timer-slot').appendChild(timerCard);
   function safeUrl(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
-  function saveTasks(){localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions()}
+  function saveTasks(){localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(SCRIPT_URL)api({action:'saveTasks',tasks:workTasks}).then(r=>{if(!r||!r.ok)toast('Task salvata solo su questo dispositivo: aggiorna Apps Script.')});if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions()}
   function openEditor(task){const t=task||{};document.getElementById('task-id').value=t.id||'';document.getElementById('task-title').value=t.title||'';document.getElementById('task-due').value=t.due||'';document.getElementById('task-duration').value=t.duration||'';document.getElementById('task-priority').value=t.priority||'media';document.getElementById('task-vgen').value=t.links?.vgen||'';document.getElementById('task-notion').value=t.links?.notion||'';document.getElementById('task-drive').value=t.links?.drive||'';const sel=document.getElementById('task-project');sel.innerHTML='<option value="">— nessun progetto —</option>'+projects.filter(p=>!p.archived).map(p=>'<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>').join('');sel.value=t.project||'';editor.classList.remove('hidden');if(window.populateGenericLinks)window.populateGenericLinks(t);document.getElementById('task-title').focus()}
   function closeEditor(){editor.classList.add('hidden');document.getElementById('task-editor-form').reset()}
   function renderTasks(){const list=document.getElementById('home-task-list');const today=new Date().toISOString().slice(0,10);const visible=workTasks.filter(t=>!t.done).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).slice(0,6);if(!visible.length)list.innerHTML='<div class="home-empty">Nessuna attività aperta. Aggiungine una quando vuoi.</div>';else list.innerHTML=visible.map(t=>{const links=t.links||{};const linkHtml=[['VGen',links.vgen],['Notion',links.notion],['Drive',links.drive]].filter(x=>safeUrl(x[1])).map(x=>'<a class="home-chip link" href="'+esc(safeUrl(x[1]))+'" target="_blank" rel="noopener">'+x[0]+' ↗</a>').join('');return '<div class="home-task"><button class="home-task-check" data-done="'+esc(t.id)+'" title="Completa"></button><div><div class="home-task-title" data-edit="'+esc(t.id)+'">'+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+(t.priority==='alta'?'<span class="home-chip" style="color:var(--danger)">priorità alta</span>':'')+linkHtml+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span></div>'}).join('');list.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{const t=workTasks.find(x=>x.id===b.dataset.done);if(t){t.done=true;t.completedAt=new Date().toISOString();saveTasks()}});list.querySelectorAll('[data-edit]').forEach(e=>e.onclick=()=>openEditor(workTasks.find(x=>x.id===e.dataset.edit)));const done=workTasks.filter(t=>t.done).length,total=workTasks.length,pct=total?Math.round(done/total*100):0;document.getElementById('home-progress-label').textContent=done+' su '+total+' completate';document.getElementById('home-progress-bar').style.width=pct+'%';document.getElementById('home-progress-pct').textContent=pct+'%';document.getElementById('home-done-count').textContent=done}
@@ -2120,6 +2134,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   const originalBuildBackup=window.buildBackup;window.buildBackup=function(){const b=originalBuildBackup();b.tasks=workTasks;b.quickNotes=quickNotes;b.timerPreferences={longBreak:document.getElementById('timer-pausa-lunga').value,longBreakEvery:document.getElementById('timer-pausa-lunga-ogni').value};return b};
   window.importWorkDashboardBackup=function(backup){if(Array.isArray(backup.tasks)){workTasks=backup.tasks;localStorage.setItem(TASK_KEY,JSON.stringify(workTasks))}if(Array.isArray(backup.quickNotes)){quickNotes=backup.quickNotes;localStorage.setItem(NOTE_KEY,JSON.stringify(quickNotes))}if(backup.timerPreferences){const lb=document.getElementById('timer-pausa-lunga'),le=document.getElementById('timer-pausa-lunga-ogni');if(lb&&backup.timerPreferences.longBreak)lb.value=backup.timerPreferences.longBreak;if(le&&backup.timerPreferences.longBreakEvery)le.value=backup.timerPreferences.longBreakEvery}renderTasks();renderNotes()};
   window.getWorkDashboardTasks=function(){return workTasks.slice()};
+  window.replaceWorkTasks=function(tasks){workTasks=Array.isArray(tasks)?tasks.slice():[];localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions()};
   window.workTaskApi={list:function(){return workTasks},save:saveTasks,open:openEditor,close:closeEditor};
   renderTasks();renderNotes();renderHomeStats();showPage('home');
 })();

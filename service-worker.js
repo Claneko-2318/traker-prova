@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v5-yuzu-icon";
+const CACHE_NAME = "tracker-lavoro-cafe-v7-task-sync";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",
@@ -30,6 +30,13 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
+
+  // I dati di Google Sheets devono arrivare sempre dalla rete.
+  // Non memorizzare mai le risposte di Apps Script nella cache della PWA.
+  if (url.hostname === "script.google.com" || url.hostname === "script.googleusercontent.com") {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
 
   if (url.origin === self.location.origin) {
     event.respondWith(
