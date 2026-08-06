@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v8-hierarchy-notes-tablet";
+const CACHE_NAME = "tracker-lavoro-cafe-v8-1-update-status";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",
@@ -26,6 +26,10 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
@@ -39,6 +43,22 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.origin === self.location.origin) {
+    // Per la pagina principale usa prima la rete: evita di mostrare una
+    // vecchia versione GitHub Pages per un intero avvio della PWA.
+    if (event.request.mode === "navigate" || url.pathname.endsWith("/working-tracker.html")) {
+      event.respondWith(
+        fetch(event.request, { cache: "no-store" })
+          .then((response) => {
+            if (response && response.status === 200) {
+              const copy = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put("./working-tracker.html", copy));
+            }
+            return response;
+          })
+          .catch(() => caches.match("./working-tracker.html"))
+      );
+      return;
+    }
     event.respondWith(
       caches.match(event.request).then((cached) => {
         const network = fetch(event.request)

@@ -1747,6 +1747,9 @@ async function loadSessions(){
   setStatus('Connessione in corso…','wait');
   const data=await api({action:'get'});
   if(data&&data.ok){
+    const versionBadge=document.getElementById('app-version-badge');
+    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.1'?'v8.1 · sincronizzato':'v8.1 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.1'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
+    if(data.backendVersion!=='8.1')toast('Tracker v8.1 attivo, ma Apps Script deve essere aggiornato.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
     // progetti
@@ -2201,7 +2204,11 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
 <style>
 /* Gerarchia task, note sincronizzate e rifiniture tablet */
+html:before{content:'TRACKER_VERSION_8.1';display:none}
 #home-new-task-inline{display:none!important}
+.app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
+.update-banner{position:fixed;left:50%;bottom:24px;z-index:220;display:flex;align-items:center;gap:10px;width:min(520px,calc(100vw - 28px));padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:0 18px 45px rgba(42,24,15,.22);transform:translateX(-50%)}
+.update-banner.hidden{display:none}.update-banner span{flex:1;color:var(--espresso);font-size:12px}.update-banner .btn{white-space:nowrap}
 .task-kind-fields{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .macro-task-group{margin:10px 0;border:1px solid var(--line);border-radius:15px;background:rgba(246,237,227,.55);overflow:hidden}
 .macro-task-group>.home-task{margin:0;padding:13px 12px;background:rgba(255,253,248,.82);border-bottom:0}
@@ -2224,6 +2231,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   .project-create-bar{align-items:stretch;flex-direction:column}
   .project-create-bar .btn{width:100%}
   .macro-task-children{padding-left:20px}
+  .update-banner{bottom:86px}
 }
 @media(max-width:560px){
   .task-kind-fields{grid-template-columns:1fr}
@@ -2323,11 +2331,26 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 })();
 </script>
 <script>
+const TRACKER_VERSION='8.1';
+function installUpdateStatus(){
+  const title=document.querySelector('.topbar-title');
+  if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
+  const banner=document.createElement('div');banner.id='update-banner';banner.className='update-banner hidden';banner.innerHTML='<span id="update-message">Nuovo aggiornamento disponibile.</span><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button>';document.body.appendChild(banner);
+  const showUpdate=message=>{document.getElementById('update-message').textContent=message||'Nuovo aggiornamento disponibile.';banner.classList.remove('hidden')};
+  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-1-update-status')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
+  return showUpdate;
+}
+const showTrackerUpdate=installUpdateStatus();
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
-      console.warn("Registrazione service worker non riuscita:", error);
-    });
+    let reloading=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}});
+    navigator.serviceWorker.register("./service-worker.js").then(reg=>{
+      reg.update();
+      if(reg.waiting)showTrackerUpdate('Versione nuova pronta: premi Aggiorna ora.');
+      reg.addEventListener('updatefound',()=>{const worker=reg.installing;if(!worker)return;worker.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)showTrackerUpdate('Versione nuova pronta: premi Aggiorna ora.')})});
+      setInterval(()=>reg.update(),15*60*1000);
+    }).catch((error) => {console.warn("Registrazione service worker non riuscita:", error);});
   });
 }
 </script>
