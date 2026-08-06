@@ -2,6 +2,7 @@ TRACKER LAVORO PWA — FILE PRINCIPALE
 
 Carica nella radice del repository GitHub tutti questi elementi:
 - working-tracker.html
+- kurorei-chill.png
 - manifest.webmanifest
 - service-worker.js
 - cartella icons

@@ -279,6 +279,7 @@ function saveNotes(notes) {
 function getAllData() {
   return {
     ok:         true,
+    backendVersion: '8.1',
     sessions:   getSessions(),
     categories: getCategories(),
     projects:   getProjects(),
