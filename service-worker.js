@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v7-task-sync";
+const CACHE_NAME = "tracker-lavoro-cafe-v8-hierarchy-notes-tablet";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",

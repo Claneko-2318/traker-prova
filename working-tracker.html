@@ -601,7 +601,7 @@ tbody tr:last-child td{border-bottom:0}
   .data-two-col{grid-template-columns:1fr}
   .topbar{background-position:44% center}
 }
-@media(max-width:760px){
+@media(max-width:900px){
   :root{--sidebar-w:0px;--hero-h:218px}
   .icon-sidebar{
     inset:auto 10px 10px;
@@ -1786,6 +1786,17 @@ async function loadSessions(){
         api({action:'saveTasks',tasks:localTasks}).then(r=>{if(r&&r.ok)toast('Task locali sincronizzate con Google Sheets.')});
       }
     }
+    // note rapide condivise, con migrazione protetta della vecchia copia locale
+    if(Array.isArray(data.notes)){
+      let localNotes=[];
+      try{localNotes=JSON.parse(localStorage.getItem('focus_quick_notes_v1')||'[]');if(!Array.isArray(localNotes))localNotes=[];}catch(e){localNotes=[];}
+      if(data.notes.length||!localNotes.length){
+        localStorage.setItem('focus_quick_notes_v1',JSON.stringify(data.notes));
+        if(window.replaceQuickNotes)window.replaceQuickNotes(data.notes);
+      }else{
+        api({action:'saveNotes',notes:localNotes}).then(r=>{if(r&&r.ok)toast('Note locali sincronizzate con Google Sheets.')});
+      }
+    }
     // umore
     if(data.moods&&Object.keys(data.moods).length>0){
       // normalizza chiavi date da Sheets
@@ -2105,7 +2116,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 .home-overview{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.home-stat{text-align:center;min-height:132px;padding:17px;border:1px solid var(--line);border-radius:17px;background:rgba(255,253,248,.9)}.home-stat-icon{display:block;color:var(--caramel);font-size:35px;line-height:1}.home-stat strong{display:block;margin:8px 0 3px;color:var(--espresso);font:500 25px 'Lora',serif}.home-stat span:last-child{color:var(--muted);font-size:11px}
 .task-editor{position:fixed;inset:0;z-index:150;display:grid;place-items:center;padding:20px;background:rgba(48,28,18,.54)}.task-editor.hidden{display:none}.task-editor-box{width:min(620px,100%);max-height:90vh;overflow:auto;padding:22px;border-radius:20px;background:var(--paper);box-shadow:0 25px 70px rgba(35,19,12,.32)}.task-editor-box h2{margin:0 0 15px;font:500 21px 'Lora',serif}.task-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.task-editor-grid .full{grid-column:1/-1}.task-editor-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
 @media(max-width:1050px){.home-grid{grid-template-columns:1fr}.home-stack{display:grid;grid-template-columns:1fr 1fr}.home-overview{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:760px){:root{--hero-h:280px}.topbar{background-position:center 25%}.home-stack{display:flex}.home-overview{grid-template-columns:1fr}.task-editor-grid{grid-template-columns:1fr}.task-editor-grid .full{grid-column:auto}}
+@media(max-width:900px){:root{--hero-h:280px}.topbar{background-position:center 25%}.home-stack{display:flex}.home-overview{grid-template-columns:1fr}.task-editor-grid{grid-template-columns:1fr}.task-editor-grid .full{grid-column:auto}}
 @media(max-width:480px){:root{--hero-h:220px}.topbar{background-position:center 22%}.home-head{align-items:flex-start;flex-direction:column}}
 </style>
 <script>
@@ -2150,7 +2161,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 .project-preview-details{margin-top:12px}.project-preview-details summary{cursor:pointer;color:var(--coffee);font-size:12px}.project-preview-session{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:11px}
 #page-projects>.card,#proj-archived-section>.card{padding:0;border:0;background:transparent;box-shadow:none;opacity:1!important}
 .project-create-bar{display:flex;align-items:flex-end;gap:10px;margin-bottom:18px;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(255,253,248,.9);box-shadow:var(--shadow-soft)}.project-create-bar .field{flex:1;margin:0}.project-create-bar input{width:100%}
-@media(max-width:760px){.topbar{margin-left:0}.main{margin-left:0;padding:18px 14px 95px}.project-preview-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.topbar{margin-left:0}.main{margin-left:0;padding:18px 14px 95px}.project-preview-grid{grid-template-columns:1fr}}
 </style>
 <script>
 (function installProjectCards(){
@@ -2186,6 +2197,129 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   const timerSetup=document.getElementById('timer-setup'),catField=document.getElementById('timer-cat').closest('.field'),taskWrap=document.createElement('div');taskWrap.className='timer-task-field';taskWrap.innerHTML='<div class="field"><label>task collegata</label><select id="timer-task"></select></div><button class="btn" type="button" id="timer-new-task">+ task</button>';catField.insertAdjacentElement('afterend',taskWrap);document.getElementById('timer-new-task').onclick=()=>api.open();
   window.refreshTimerTaskOptions=function(){const sel=document.getElementById('timer-task');if(!sel)return;const prev=sel.value;sel.innerHTML='<option value="">— scegli o aggiungi —</option><option value="__none__">nessuna task</option>'+api.list().filter(t=>!t.done).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>').join('');if([...sel.options].some(o=>o.value===prev))sel.value=prev};
   window.refreshTimerTaskOptions();window.renderWorkTasksGeneric(api.list());
+})();
+</script>
+<style>
+/* Gerarchia task, note sincronizzate e rifiniture tablet */
+#home-new-task-inline{display:none!important}
+.task-kind-fields{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.macro-task-group{margin:10px 0;border:1px solid var(--line);border-radius:15px;background:rgba(246,237,227,.55);overflow:hidden}
+.macro-task-group>.home-task{margin:0;padding:13px 12px;background:rgba(255,253,248,.82);border-bottom:0}
+.macro-task-label{display:inline-flex;margin-right:6px;padding:2px 7px;border-radius:999px;background:var(--coffee);color:#fff;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+.macro-task-children{padding:0 10px 7px 28px}
+.macro-task-children .home-task{position:relative;padding:10px 5px}
+.macro-task-children .home-task:before{content:'';position:absolute;left:-15px;top:0;bottom:50%;width:10px;border-left:1px solid var(--caramel);border-bottom:1px solid var(--caramel);border-radius:0 0 0 7px}
+.macro-task-empty{padding:8px 8px 11px;color:var(--muted);font-size:10px;font-style:italic}
+.home-note{position:relative;padding-right:31px}
+.home-note-delete{position:absolute;right:5px;top:5px;width:24px;height:24px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:16px}
+.home-note-delete:hover{background:var(--paper-deep);color:var(--danger)}
+@media(max-width:900px){
+  .main{padding-left:18px!important;padding-right:18px!important}
+  .workspace,.page-section{min-width:0}
+  .home-grid{gap:16px}
+  .home-card{padding:16px}
+  .home-head{gap:12px;margin-bottom:16px}
+  .home-actions{display:flex;flex-wrap:wrap;gap:8px}
+  .home-actions .btn{flex:1 1 150px}
+  .project-create-bar{align-items:stretch;flex-direction:column}
+  .project-create-bar .btn{width:100%}
+  .macro-task-children{padding-left:20px}
+}
+@media(max-width:560px){
+  .task-kind-fields{grid-template-columns:1fr}
+  .home-task{grid-template-columns:22px minmax(0,1fr) 28px!important}
+  .home-task-time{grid-column:2;justify-self:start}
+  .home-task-delete{grid-column:3;grid-row:1}
+  .macro-task-children{padding-left:13px;padding-right:7px}
+}
+</style>
+<script>
+(function installTaskHierarchyNotesAndProjectCleanup(){
+  const taskApi=window.workTaskApi;
+  if(!taskApi)return;
+
+  const editorGrid=document.querySelector('#task-editor-form .task-editor-grid');
+  const genericLinks=editorGrid.querySelector('.generic-links');
+  const kindFields=document.createElement('div');
+  kindFields.className='task-kind-fields';
+  kindFields.innerHTML='<div class="field"><label>tipo</label><select id="task-kind"><option value="task">Task</option><option value="macro">Macro-task</option></select></div><div class="field" id="task-parent-field"><label>dentro la macro-task</label><select id="task-parent"><option value="">— nessuna, task indipendente —</option></select></div>';
+  editorGrid.insertBefore(kindFields,genericLinks||null);
+
+  const originalOpen=taskApi.open;
+  taskApi.open=function(task){
+    originalOpen(task);
+    const current=task||{};
+    const kind=document.getElementById('task-kind');
+    const parent=document.getElementById('task-parent');
+    kind.value=current.type==='macro'?'macro':'task';
+    parent.innerHTML='<option value="">— nessuna, task indipendente —</option>'+taskApi.list().filter(t=>t.type==='macro'&&String(t.id)!==String(current.id||'')).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>').join('');
+    parent.value=current.parentId||'';
+    updateParentVisibility();
+  };
+  document.getElementById('home-new-task').onclick=()=>taskApi.open();
+  document.getElementById('task-kind').onchange=updateParentVisibility;
+  function updateParentVisibility(){
+    const isMacro=document.getElementById('task-kind').value==='macro';
+    document.getElementById('task-parent-field').style.display=isMacro?'none':'';
+    if(isMacro)document.getElementById('task-parent').value='';
+  }
+
+  function safeUrl(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
+  function linkEntries(task){const links=task.links||{};return Array.isArray(links)?links.map(l=>[l.label,l.url]):Object.entries(links)}
+  function taskRow(t,isMacro){
+    const links=linkEntries(t).map(([label,url])=>[String(label||'Link'),safeUrl(url)]).filter(x=>x[1]).map(x=>'<a class="home-chip link" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join('');
+    const today=new Date().toISOString().slice(0,10);
+    return '<div class="home-task'+(t.done?' is-complete':'')+'" data-task-row="'+esc(t.id)+'"><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+(isMacro?'<span class="macro-task-label">Macro</span>':'')+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+links+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
+  }
+  function bindTaskActions(list){
+    list.querySelectorAll('[data-toggle-task]').forEach(b=>b.onclick=()=>{const t=taskApi.list().find(x=>String(x.id)===String(b.dataset.toggleTask));if(t){t.done=!t.done;t.completedAt=t.done?new Date().toISOString():'';taskApi.save()}});
+    list.querySelectorAll('[data-edit-task]').forEach(e=>e.onclick=()=>taskApi.open(taskApi.list().find(x=>String(x.id)===String(e.dataset.editTask))));
+    list.querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=()=>{const tasks=taskApi.list(),index=tasks.findIndex(t=>String(t.id)===String(b.dataset.deleteTask));if(index<0)return;const task=tasks[index];const children=tasks.filter(t=>String(t.parentId||'')===String(task.id));const extra=children.length?' Le '+children.length+' sotto-task verranno spostate fuori dalla macro-task.':'';if(!confirm('Eliminare definitivamente l’attività “'+task.title+'”?'+extra))return;children.forEach(t=>t.parentId='');tasks.splice(index,1);taskApi.save();toast('Attività eliminata.')});
+  }
+  window.renderWorkTasksGeneric=function(tasks){
+    tasks.forEach(t=>{if(t.type!=='macro')t.type='task';if(!t.parentId)t.parentId=''});
+    const list=document.getElementById('home-task-list');
+    const showCompleted=document.querySelector('.completed-toggle')?.classList.contains('active');
+    const visible=tasks.filter(t=>showCompleted||!t.done);
+    const macros=visible.filter(t=>t.type==='macro').sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+    const validMacroIds=new Set(tasks.filter(t=>t.type==='macro').map(t=>String(t.id)));
+    const standalone=visible.filter(t=>t.type!=='macro'&&(!t.parentId||!validMacroIds.has(String(t.parentId)))).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+    let html=standalone.map(t=>taskRow(t,false)).join('');
+    html+=macros.map(m=>{const children=visible.filter(t=>t.type!=='macro'&&String(t.parentId||'')===String(m.id)).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));return '<section class="macro-task-group">'+taskRow(m,true)+'<div class="macro-task-children">'+(children.length?children.map(t=>taskRow(t,false)).join(''):'<div class="macro-task-empty">Nessuna sotto-task: modifica una task per spostarla qui.</div>')+'</div></section>'}).join('');
+    list.innerHTML=html||'<div class="home-empty">Nessuna attività aperta.</div>';
+    bindTaskActions(list);
+    const done=tasks.filter(t=>t.done).length,total=tasks.length,pct=total?Math.round(done/total*100):0;
+    document.getElementById('home-progress-label').textContent=done+' su '+total+' completate';document.getElementById('home-progress-bar').style.width=pct+'%';document.getElementById('home-progress-pct').textContent=pct+'%';document.getElementById('home-done-count').textContent=done;
+  };
+
+  document.getElementById('task-editor-form').onsubmit=e=>{
+    e.preventDefault();
+    const id=document.getElementById('task-id').value||String(Date.now()),tasks=taskApi.list(),old=tasks.find(t=>String(t.id)===String(id)),links={};
+    document.querySelectorAll('.generic-link-row').forEach((row,index)=>{const label=row.querySelector('.generic-link-label').value.trim()||('Link '+(index+1)),url=row.querySelector('.generic-link-url').value.trim();if(safeUrl(url)){let key=label,n=2;while(links[key])key=label+' '+n++;links[key]=safeUrl(url)}});
+    const type=document.getElementById('task-kind').value;
+    const task={id,title:document.getElementById('task-title').value.trim(),type,parentId:type==='macro'?'':document.getElementById('task-parent').value,project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links,done:old?.done||false,completedAt:old?.completedAt||'',createdAt:old?.createdAt||new Date().toISOString()};
+    if(!task.title)return;
+    if(old&&old.type==='macro'&&type!=='macro')tasks.filter(t=>String(t.parentId||'')===String(id)).forEach(t=>t.parentId='');
+    if(old)Object.assign(old,task);else tasks.unshift(task);
+    taskApi.save();taskApi.close();
+  };
+
+  let syncedNotes=[];
+  try{syncedNotes=JSON.parse(localStorage.getItem('focus_quick_notes_v1')||'[]');if(!Array.isArray(syncedNotes))syncedNotes=[]}catch(e){syncedNotes=[]}
+  function renderSyncedNotes(){const el=document.getElementById('home-note-list');el.innerHTML=syncedNotes.slice(0,20).map(n=>'<div class="home-note">'+esc(n.text)+'<br><small>'+new Date(n.at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</small><button class="home-note-delete" data-note-id="'+esc(n.id||n.at)+'" title="Elimina nota">×</button></div>').join('');el.querySelectorAll('[data-note-id]').forEach(b=>b.onclick=()=>{syncedNotes=syncedNotes.filter(n=>String(n.id||n.at)!==String(b.dataset.noteId));saveSyncedNotes()})}
+  function saveSyncedNotes(){localStorage.setItem('focus_quick_notes_v1',JSON.stringify(syncedNotes));renderSyncedNotes();if(SCRIPT_URL)api({action:'saveNotes',notes:syncedNotes}).then(r=>{if(!r||!r.ok)toast('Nota salvata solo su questo dispositivo.')})}
+  window.replaceQuickNotes=function(notes){syncedNotes=Array.isArray(notes)?notes.slice():[];localStorage.setItem('focus_quick_notes_v1',JSON.stringify(syncedNotes));renderSyncedNotes()};
+  document.getElementById('home-save-note').onclick=()=>{const input=document.getElementById('home-note-input'),text=input.value.trim();if(!text)return;const at=new Date().toISOString();syncedNotes.unshift({id:String(Date.now()),text,at});syncedNotes=syncedNotes.slice(0,20);input.value='';saveSyncedNotes()};
+  renderSyncedNotes();
+
+  window.renderProjectsPage=function(){
+    const elA=document.getElementById('proj-page-active'),elArch=document.getElementById('proj-page-archived'),secArch=document.getElementById('proj-archived-section');if(!elA)return;
+    const tasks=taskApi.list();
+    function validLink(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
+    function card(p,i){const linked=getLinkedSessions(p.name),mins=linked.reduce((a,s)=>a+Number(s.minutes||0),0),pt=tasks.filter(t=>t.project===p.name),urls={};pt.forEach(t=>Object.entries(t.links||{}).forEach(([k,v])=>{if(validLink(v)&&!urls[k])urls[k]=validLink(v)}));const links=Object.entries(urls).map(([k,v])=>'<a class="home-chip link" href="'+esc(v)+'" target="_blank" rel="noopener">'+esc(k)+' ↗</a>').join('');const rows=linked.slice(0,6).map(s=>'<div class="project-preview-session"><span>'+fmt(s.date)+'</span><span>'+esc(s.category||'Sessione')+'</span><b>'+toHours(Number(s.minutes||0))+'</b></div>').join('');return '<article class="project-preview-card"><div class="project-preview-head"><span class="project-preview-icon">'+(p.archived?'🗄':'▱')+'</span><strong>'+esc(p.name)+'</strong></div><div class="project-preview-meta">'+pt.filter(t=>!t.done).length+' attività aperte · '+(mins?toHours(mins)+' lavorate':'nessuna sessione')+'</div><div class="project-preview-links">'+(links||'<span class="home-chip">nessun link esterno</span>')+'</div><details class="project-preview-details"><summary>Sessioni collegate ('+linked.length+')</summary>'+(rows||'<div class="home-empty">Nessuna sessione collegata.</div>')+'</details><div class="project-preview-actions"><button class="btn btn-sm" onclick="toggleProjArchive('+i+')">'+(p.archived?'↩ ripristina':'archivia')+'</button></div></article>'}
+    const active=projects.map((p,i)=>({p,i})).filter(x=>!x.p.archived),archived=projects.map((p,i)=>({p,i})).filter(x=>x.p.archived);elA.className='project-preview-grid';elA.innerHTML=active.length?active.map(x=>card(x.p,x.i)).join(''):'<div class="home-empty">Nessun progetto attivo.</div>';if(archived.length){secArch.style.display='';elArch.className='project-preview-grid';elArch.innerHTML=archived.map(x=>card(x.p,x.i)).join('')}else secArch.style.display='none';
+  };
+  window.renderWorkTasksGeneric(taskApi.list());window.renderProjectsPage();
 })();
 </script>
 <script>
