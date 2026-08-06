@@ -1748,8 +1748,8 @@ async function loadSessions(){
   const data=await api({action:'get'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
-    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.1'?'v8.1 · sincronizzato':'v8.1 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.1'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
-    if(data.backendVersion!=='8.1')toast('Tracker v8.1 attivo, ma Apps Script deve essere aggiornato.');
+    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.1'?'v8.2 · sincronizzato':'v8.2 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.1'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
+    if(data.backendVersion!=='8.1')toast('Tracker v8.2 attivo, ma Apps Script deve essere aggiornato.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
     // progetti
@@ -2204,19 +2204,24 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
 <style>
 /* Gerarchia task, note sincronizzate e rifiniture tablet */
-html:before{content:'TRACKER_VERSION_8.1';display:none}
+html:before{content:'TRACKER_VERSION_8.2';display:none}
 #home-new-task-inline{display:none!important}
 .app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
 .update-banner{position:fixed;left:50%;bottom:24px;z-index:220;display:flex;align-items:center;gap:10px;width:min(520px,calc(100vw - 28px));padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:0 18px 45px rgba(42,24,15,.22);transform:translateX(-50%)}
 .update-banner.hidden{display:none}.update-banner span{flex:1;color:var(--espresso);font-size:12px}.update-banner .btn{white-space:nowrap}
-.task-kind-fields{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.macro-task-group{margin:10px 0;border:1px solid var(--line);border-radius:15px;background:rgba(246,237,227,.55);overflow:hidden}
-.macro-task-group>.home-task{margin:0;padding:13px 12px;background:rgba(255,253,248,.82);border-bottom:0}
-.macro-task-label{display:inline-flex;margin-right:6px;padding:2px 7px;border-radius:999px;background:var(--coffee);color:#fff;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
-.macro-task-children{padding:0 10px 7px 28px}
-.macro-task-children .home-task{position:relative;padding:10px 5px}
-.macro-task-children .home-task:before{content:'';position:absolute;left:-15px;top:0;bottom:50%;width:10px;border-left:1px solid var(--caramel);border-bottom:1px solid var(--caramel);border-radius:0 0 0 7px}
-.macro-task-empty{padding:8px 8px 11px;color:var(--muted);font-size:10px;font-style:italic}
+.task-parent-fields{grid-column:1/-1}
+.task-tree-group{margin:6px 0;border:1px solid transparent;border-radius:14px;transition:.18s ease}
+.task-tree-group:has(>.task-children:not(:empty)){border-color:var(--line);background:rgba(246,237,227,.42)}
+.task-tree-group>.home-task{margin:0;padding:12px 10px}
+.task-children{margin-left:27px;padding:0 8px 5px 12px;border-left:1px solid var(--caramel)}
+.task-children:empty{display:none}
+.task-children .home-task{padding:10px 4px}
+.home-task[draggable="true"]{cursor:grab}.home-task[draggable="true"]:active{cursor:grabbing}
+.home-task.dragging{opacity:.38}.home-task.drag-target{outline:2px dashed var(--caramel);outline-offset:-3px;background:var(--paper-deep)}
+.task-root-drop{display:none;margin:7px 0;padding:9px;border:1px dashed var(--caramel);border-radius:12px;color:var(--coffee);background:var(--paper-warm);text-align:center;font-size:10px}.task-root-drop.drag-target{background:var(--paper-deep);outline:0}.task-list-dragging>.task-root-drop{display:block}
+.home-task-check{display:grid!important;place-items:center!important;padding:0!important;line-height:1!important;font-size:12px!important;text-align:center!important}
+#page-insert .mode-pom,#page-insert .mode-time{margin-top:12px}
+#page-insert .field-pom,#page-insert .field-dur,#page-insert .field-custom{flex:0 1 187px}
 .home-note{position:relative;padding-right:31px}
 .home-note-delete{position:absolute;right:5px;top:5px;width:24px;height:24px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:16px}
 .home-note-delete:hover{background:var(--paper-deep);color:var(--danger)}
@@ -2230,15 +2235,16 @@ html:before{content:'TRACKER_VERSION_8.1';display:none}
   .home-actions .btn{flex:1 1 150px}
   .project-create-bar{align-items:stretch;flex-direction:column}
   .project-create-bar .btn{width:100%}
-  .macro-task-children{padding-left:20px}
+  .task-children{margin-left:20px;padding-left:10px}
   .update-banner{bottom:86px}
 }
 @media(max-width:560px){
-  .task-kind-fields{grid-template-columns:1fr}
   .home-task{grid-template-columns:22px minmax(0,1fr) 28px!important}
   .home-task-time{grid-column:2;justify-self:start}
   .home-task-delete{grid-column:3;grid-row:1}
-  .macro-task-children{padding-left:13px;padding-right:7px}
+  .task-children{margin-left:12px;padding-left:8px;padding-right:3px}
+  #page-insert .field-pom,#page-insert .field-dur{flex:1 1 calc(50% - 6px)}
+  #page-insert .field-custom{flex:1 1 100%}
 }
 </style>
 <script>
@@ -2248,53 +2254,49 @@ html:before{content:'TRACKER_VERSION_8.1';display:none}
 
   const editorGrid=document.querySelector('#task-editor-form .task-editor-grid');
   const genericLinks=editorGrid.querySelector('.generic-links');
-  const kindFields=document.createElement('div');
-  kindFields.className='task-kind-fields';
-  kindFields.innerHTML='<div class="field"><label>tipo</label><select id="task-kind"><option value="task">Task</option><option value="macro">Macro-task</option></select></div><div class="field" id="task-parent-field"><label>dentro la macro-task</label><select id="task-parent"><option value="">— nessuna, task indipendente —</option></select></div>';
-  editorGrid.insertBefore(kindFields,genericLinks||null);
+  const parentFields=document.createElement('div');
+  parentFields.className='task-parent-fields';
+  parentFields.innerHTML='<div class="field"><label>dentro un’altra task</label><select id="task-parent"><option value="">— nessuna, task indipendente —</option></select></div>';
+  editorGrid.insertBefore(parentFields,genericLinks||null);
 
   const originalOpen=taskApi.open;
   taskApi.open=function(task){
     originalOpen(task);
     const current=task||{};
-    const kind=document.getElementById('task-kind');
     const parent=document.getElementById('task-parent');
-    kind.value=current.type==='macro'?'macro':'task';
-    parent.innerHTML='<option value="">— nessuna, task indipendente —</option>'+taskApi.list().filter(t=>t.type==='macro'&&String(t.id)!==String(current.id||'')).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>').join('');
+    const excluded=new Set([String(current.id||'')]);
+    let changed=true;while(changed){changed=false;taskApi.list().forEach(t=>{if(t.parentId&&excluded.has(String(t.parentId))&&!excluded.has(String(t.id))){excluded.add(String(t.id));changed=true}})}
+    parent.innerHTML='<option value="">— nessuna, task indipendente —</option>'+taskApi.list().filter(t=>!excluded.has(String(t.id))).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>').join('');
     parent.value=current.parentId||'';
-    updateParentVisibility();
   };
   document.getElementById('home-new-task').onclick=()=>taskApi.open();
-  document.getElementById('task-kind').onchange=updateParentVisibility;
-  function updateParentVisibility(){
-    const isMacro=document.getElementById('task-kind').value==='macro';
-    document.getElementById('task-parent-field').style.display=isMacro?'none':'';
-    if(isMacro)document.getElementById('task-parent').value='';
-  }
 
   function safeUrl(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
   function linkEntries(task){const links=task.links||{};return Array.isArray(links)?links.map(l=>[l.label,l.url]):Object.entries(links)}
-  function taskRow(t,isMacro){
+  function taskRow(t){
     const links=linkEntries(t).map(([label,url])=>[String(label||'Link'),safeUrl(url)]).filter(x=>x[1]).map(x=>'<a class="home-chip link" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join('');
     const today=new Date().toISOString().slice(0,10);
-    return '<div class="home-task'+(t.done?' is-complete':'')+'" data-task-row="'+esc(t.id)+'"><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+(isMacro?'<span class="macro-task-label">Macro</span>':'')+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+links+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
+    return '<div class="home-task'+(t.done?' is-complete':'')+'" draggable="true" data-task-row="'+esc(t.id)+'"><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+links+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
   }
   function bindTaskActions(list){
     list.querySelectorAll('[data-toggle-task]').forEach(b=>b.onclick=()=>{const t=taskApi.list().find(x=>String(x.id)===String(b.dataset.toggleTask));if(t){t.done=!t.done;t.completedAt=t.done?new Date().toISOString():'';taskApi.save()}});
     list.querySelectorAll('[data-edit-task]').forEach(e=>e.onclick=()=>taskApi.open(taskApi.list().find(x=>String(x.id)===String(e.dataset.editTask))));
-    list.querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=()=>{const tasks=taskApi.list(),index=tasks.findIndex(t=>String(t.id)===String(b.dataset.deleteTask));if(index<0)return;const task=tasks[index];const children=tasks.filter(t=>String(t.parentId||'')===String(task.id));const extra=children.length?' Le '+children.length+' sotto-task verranno spostate fuori dalla macro-task.':'';if(!confirm('Eliminare definitivamente l’attività “'+task.title+'”?'+extra))return;children.forEach(t=>t.parentId='');tasks.splice(index,1);taskApi.save();toast('Attività eliminata.')});
+    list.querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=()=>{const tasks=taskApi.list(),index=tasks.findIndex(t=>String(t.id)===String(b.dataset.deleteTask));if(index<0)return;const task=tasks[index];const children=tasks.filter(t=>String(t.parentId||'')===String(task.id));const extra=children.length?' Le '+children.length+' sotto-task verranno spostate al livello superiore.':'';if(!confirm('Eliminare definitivamente l’attività “'+task.title+'”?'+extra))return;children.forEach(t=>t.parentId=task.parentId||'');tasks.splice(index,1);taskApi.save();toast('Attività eliminata.')});
+    let draggedId='';
+    list.querySelectorAll('[data-task-row]').forEach(row=>{row.ondragstart=e=>{draggedId=row.dataset.taskRow;row.classList.add('dragging');list.classList.add('task-list-dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',draggedId)};row.ondragend=()=>{draggedId='';list.classList.remove('task-list-dragging');list.querySelectorAll('.dragging,.drag-target').forEach(x=>x.classList.remove('dragging','drag-target'))};row.ondragover=e=>{if(draggedId&&draggedId!==row.dataset.taskRow){e.preventDefault();row.classList.add('drag-target')}};row.ondragleave=()=>row.classList.remove('drag-target');row.ondrop=e=>{e.preventDefault();e.stopPropagation();row.classList.remove('drag-target');moveTask(draggedId,row.dataset.taskRow)}});
+    const rootDrop=list.querySelector('.task-root-drop');if(rootDrop){rootDrop.ondragover=e=>{if(draggedId){e.preventDefault();rootDrop.classList.add('drag-target')}};rootDrop.ondragleave=()=>rootDrop.classList.remove('drag-target');rootDrop.ondrop=e=>{e.preventDefault();rootDrop.classList.remove('drag-target');moveTask(draggedId,'')}}
   }
+  function moveTask(taskId,parentId){const tasks=taskApi.list(),moving=tasks.find(t=>String(t.id)===String(taskId));if(!moving||String(taskId)===String(parentId))return;let cursor=tasks.find(t=>String(t.id)===String(parentId));while(cursor){if(String(cursor.id)===String(taskId)){toast('Non puoi spostare una task dentro una sua sotto-task.');return}cursor=tasks.find(t=>String(t.id)===String(cursor.parentId||''))}moving.parentId=parentId||'';delete moving.type;taskApi.save();toast(parentId?'Task spostata.':'Task riportata al livello principale.')}
   window.renderWorkTasksGeneric=function(tasks){
-    tasks.forEach(t=>{if(t.type!=='macro')t.type='task';if(!t.parentId)t.parentId=''});
+    tasks.forEach(t=>{if(!t.parentId)t.parentId='';delete t.type});
     const list=document.getElementById('home-task-list');
     const showCompleted=document.querySelector('.completed-toggle')?.classList.contains('active');
     const visible=tasks.filter(t=>showCompleted||!t.done);
-    const macros=visible.filter(t=>t.type==='macro').sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
-    const validMacroIds=new Set(tasks.filter(t=>t.type==='macro').map(t=>String(t.id)));
-    const standalone=visible.filter(t=>t.type!=='macro'&&(!t.parentId||!validMacroIds.has(String(t.parentId)))).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
-    let html=standalone.map(t=>taskRow(t,false)).join('');
-    html+=macros.map(m=>{const children=visible.filter(t=>t.type!=='macro'&&String(t.parentId||'')===String(m.id)).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));return '<section class="macro-task-group">'+taskRow(m,true)+'<div class="macro-task-children">'+(children.length?children.map(t=>taskRow(t,false)).join(''):'<div class="macro-task-empty">Nessuna sotto-task: modifica una task per spostarla qui.</div>')+'</div></section>'}).join('');
-    list.innerHTML=html||'<div class="home-empty">Nessuna attività aperta.</div>';
+    const visibleIds=new Set(visible.map(t=>String(t.id)));
+    const roots=visible.filter(t=>!t.parentId||!visibleIds.has(String(t.parentId))).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+    function branch(t){const children=visible.filter(x=>String(x.parentId||'')===String(t.id)).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));return '<section class="task-tree-group">'+taskRow(t)+'<div class="task-children">'+children.map(branch).join('')+'</div></section>'}
+    const html=roots.map(branch).join('');
+    list.innerHTML='<div class="task-root-drop">Trascina qui per riportare la task al livello principale</div>'+(html||'<div class="home-empty">Nessuna attività aperta.</div>');
     bindTaskActions(list);
     const done=tasks.filter(t=>t.done).length,total=tasks.length,pct=total?Math.round(done/total*100):0;
     document.getElementById('home-progress-label').textContent=done+' su '+total+' completate';document.getElementById('home-progress-bar').style.width=pct+'%';document.getElementById('home-progress-pct').textContent=pct+'%';document.getElementById('home-done-count').textContent=done;
@@ -2304,10 +2306,8 @@ html:before{content:'TRACKER_VERSION_8.1';display:none}
     e.preventDefault();
     const id=document.getElementById('task-id').value||String(Date.now()),tasks=taskApi.list(),old=tasks.find(t=>String(t.id)===String(id)),links={};
     document.querySelectorAll('.generic-link-row').forEach((row,index)=>{const label=row.querySelector('.generic-link-label').value.trim()||('Link '+(index+1)),url=row.querySelector('.generic-link-url').value.trim();if(safeUrl(url)){let key=label,n=2;while(links[key])key=label+' '+n++;links[key]=safeUrl(url)}});
-    const type=document.getElementById('task-kind').value;
-    const task={id,title:document.getElementById('task-title').value.trim(),type,parentId:type==='macro'?'':document.getElementById('task-parent').value,project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links,done:old?.done||false,completedAt:old?.completedAt||'',createdAt:old?.createdAt||new Date().toISOString()};
+    const task={id,title:document.getElementById('task-title').value.trim(),parentId:document.getElementById('task-parent').value,project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links,done:old?.done||false,completedAt:old?.completedAt||'',createdAt:old?.createdAt||new Date().toISOString()};
     if(!task.title)return;
-    if(old&&old.type==='macro'&&type!=='macro')tasks.filter(t=>String(t.parentId||'')===String(id)).forEach(t=>t.parentId='');
     if(old)Object.assign(old,task);else tasks.unshift(task);
     taskApi.save();taskApi.close();
   };
@@ -2331,13 +2331,13 @@ html:before{content:'TRACKER_VERSION_8.1';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='8.1';
+const TRACKER_VERSION='8.2';
 function installUpdateStatus(){
   const title=document.querySelector('.topbar-title');
   if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
   const banner=document.createElement('div');banner.id='update-banner';banner.className='update-banner hidden';banner.innerHTML='<span id="update-message">Nuovo aggiornamento disponibile.</span><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button>';document.body.appendChild(banner);
   const showUpdate=message=>{document.getElementById('update-message').textContent=message||'Nuovo aggiornamento disponibile.';banner.classList.remove('hidden')};
-  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-1-update-status')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
+  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-2-task-nesting-css')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
   return showUpdate;
 }
 const showTrackerUpdate=installUpdateStatus();
