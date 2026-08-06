@@ -1748,8 +1748,8 @@ async function loadSessions(){
   const data=await api({action:'get'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
-    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.1'?'v8.2 · sincronizzato':'v8.2 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.1'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
-    if(data.backendVersion!=='8.1')toast('Tracker v8.2 attivo, ma Apps Script deve essere aggiornato.');
+    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.1'?'v8.3 · sincronizzato':'v8.3 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.1'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
+    if(data.backendVersion!=='8.1')toast('Tracker v8.3 attivo, ma Apps Script deve essere aggiornato.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
     // progetti
@@ -2204,7 +2204,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
 <style>
 /* Gerarchia task, note sincronizzate e rifiniture tablet */
-html:before{content:'TRACKER_VERSION_8.2';display:none}
+html:before{content:'TRACKER_VERSION_8.3';display:none}
 #home-new-task-inline{display:none!important}
 .app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
 .update-banner{position:fixed;left:50%;bottom:24px;z-index:220;display:flex;align-items:center;gap:10px;width:min(520px,calc(100vw - 28px));padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:0 18px 45px rgba(42,24,15,.22);transform:translateX(-50%)}
@@ -2216,8 +2216,9 @@ html:before{content:'TRACKER_VERSION_8.2';display:none}
 .task-children{margin-left:27px;padding:0 8px 5px 12px;border-left:1px solid var(--caramel)}
 .task-children:empty{display:none}
 .task-children .home-task{padding:10px 4px}
-.home-task[draggable="true"]{cursor:grab}.home-task[draggable="true"]:active{cursor:grabbing}
 .home-task.dragging{opacity:.38}.home-task.drag-target{outline:2px dashed var(--caramel);outline-offset:-3px;background:var(--paper-deep)}
+.home-task{grid-template-columns:24px 22px minmax(0,1fr) auto 30px!important}
+.task-drag-handle{display:grid;place-items:center;width:24px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:17px;line-height:1;cursor:grab;touch-action:none;user-select:none}.task-drag-handle:hover{background:var(--paper-deep);color:var(--coffee)}.task-drag-handle:active{cursor:grabbing}
 .task-root-drop{display:none;margin:7px 0;padding:9px;border:1px dashed var(--caramel);border-radius:12px;color:var(--coffee);background:var(--paper-warm);text-align:center;font-size:10px}.task-root-drop.drag-target{background:var(--paper-deep);outline:0}.task-list-dragging>.task-root-drop{display:block}
 .home-task-check{display:grid!important;place-items:center!important;padding:0!important;line-height:1!important;font-size:12px!important;text-align:center!important}
 #page-insert .mode-pom,#page-insert .mode-time{margin-top:12px}
@@ -2239,9 +2240,9 @@ html:before{content:'TRACKER_VERSION_8.2';display:none}
   .update-banner{bottom:86px}
 }
 @media(max-width:560px){
-  .home-task{grid-template-columns:22px minmax(0,1fr) 28px!important}
-  .home-task-time{grid-column:2;justify-self:start}
-  .home-task-delete{grid-column:3;grid-row:1}
+  .home-task{grid-template-columns:24px 22px minmax(0,1fr) 28px!important}
+  .home-task-time{grid-column:3;justify-self:start}
+  .home-task-delete{grid-column:4;grid-row:1}
   .task-children{margin-left:12px;padding-left:8px;padding-right:3px}
   #page-insert .field-pom,#page-insert .field-dur{flex:1 1 calc(50% - 6px)}
   #page-insert .field-custom{flex:1 1 100%}
@@ -2276,15 +2277,13 @@ html:before{content:'TRACKER_VERSION_8.2';display:none}
   function taskRow(t){
     const links=linkEntries(t).map(([label,url])=>[String(label||'Link'),safeUrl(url)]).filter(x=>x[1]).map(x=>'<a class="home-chip link" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join('');
     const today=new Date().toISOString().slice(0,10);
-    return '<div class="home-task'+(t.done?' is-complete':'')+'" draggable="true" data-task-row="'+esc(t.id)+'"><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+links+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
+    return '<div class="home-task'+(t.done?' is-complete':'')+'" data-task-row="'+esc(t.id)+'"><button class="task-drag-handle" type="button" data-drag-task="'+esc(t.id)+'" title="Trascina per spostare" aria-label="Trascina per spostare">≡</button><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+links+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
   }
   function bindTaskActions(list){
     list.querySelectorAll('[data-toggle-task]').forEach(b=>b.onclick=()=>{const t=taskApi.list().find(x=>String(x.id)===String(b.dataset.toggleTask));if(t){t.done=!t.done;t.completedAt=t.done?new Date().toISOString():'';taskApi.save()}});
     list.querySelectorAll('[data-edit-task]').forEach(e=>e.onclick=()=>taskApi.open(taskApi.list().find(x=>String(x.id)===String(e.dataset.editTask))));
     list.querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=()=>{const tasks=taskApi.list(),index=tasks.findIndex(t=>String(t.id)===String(b.dataset.deleteTask));if(index<0)return;const task=tasks[index];const children=tasks.filter(t=>String(t.parentId||'')===String(task.id));const extra=children.length?' Le '+children.length+' sotto-task verranno spostate al livello superiore.':'';if(!confirm('Eliminare definitivamente l’attività “'+task.title+'”?'+extra))return;children.forEach(t=>t.parentId=task.parentId||'');tasks.splice(index,1);taskApi.save();toast('Attività eliminata.')});
-    let draggedId='';
-    list.querySelectorAll('[data-task-row]').forEach(row=>{row.ondragstart=e=>{draggedId=row.dataset.taskRow;row.classList.add('dragging');list.classList.add('task-list-dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',draggedId)};row.ondragend=()=>{draggedId='';list.classList.remove('task-list-dragging');list.querySelectorAll('.dragging,.drag-target').forEach(x=>x.classList.remove('dragging','drag-target'))};row.ondragover=e=>{if(draggedId&&draggedId!==row.dataset.taskRow){e.preventDefault();row.classList.add('drag-target')}};row.ondragleave=()=>row.classList.remove('drag-target');row.ondrop=e=>{e.preventDefault();e.stopPropagation();row.classList.remove('drag-target');moveTask(draggedId,row.dataset.taskRow)}});
-    const rootDrop=list.querySelector('.task-root-drop');if(rootDrop){rootDrop.ondragover=e=>{if(draggedId){e.preventDefault();rootDrop.classList.add('drag-target')}};rootDrop.ondragleave=()=>rootDrop.classList.remove('drag-target');rootDrop.ondrop=e=>{e.preventDefault();rootDrop.classList.remove('drag-target');moveTask(draggedId,'')}}
+    list.querySelectorAll('[data-drag-task]').forEach(handle=>{handle.onpointerdown=e=>{if(e.button!==undefined&&e.button!==0)return;e.preventDefault();const draggedId=handle.dataset.dragTask,source=handle.closest('[data-task-row]');source.classList.add('dragging');list.classList.add('task-list-dragging');handle.setPointerCapture?.(e.pointerId);let targetId=null;const highlight=(x,y)=>{list.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'));const under=document.elementFromPoint(x,y);const root=under&&under.closest('.task-root-drop');const row=under&&under.closest('[data-task-row]');if(root){root.classList.add('drag-target');targetId=''}else if(row&&row.dataset.taskRow!==draggedId){row.classList.add('drag-target');targetId=row.dataset.taskRow}else targetId=null};const move=ev=>{ev.preventDefault();highlight(ev.clientX,ev.clientY)};const finish=ev=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',finish);document.removeEventListener('pointercancel',cancel);source.classList.remove('dragging');list.classList.remove('task-list-dragging');list.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'));if(targetId!==null)moveTask(draggedId,targetId)};const cancel=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',finish);document.removeEventListener('pointercancel',cancel);source.classList.remove('dragging');list.classList.remove('task-list-dragging');list.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'))};document.addEventListener('pointermove',move,{passive:false});document.addEventListener('pointerup',finish,{once:true});document.addEventListener('pointercancel',cancel,{once:true})}});
   }
   function moveTask(taskId,parentId){const tasks=taskApi.list(),moving=tasks.find(t=>String(t.id)===String(taskId));if(!moving||String(taskId)===String(parentId))return;let cursor=tasks.find(t=>String(t.id)===String(parentId));while(cursor){if(String(cursor.id)===String(taskId)){toast('Non puoi spostare una task dentro una sua sotto-task.');return}cursor=tasks.find(t=>String(t.id)===String(cursor.parentId||''))}moving.parentId=parentId||'';delete moving.type;taskApi.save();toast(parentId?'Task spostata.':'Task riportata al livello principale.')}
   window.renderWorkTasksGeneric=function(tasks){
@@ -2331,13 +2330,13 @@ html:before{content:'TRACKER_VERSION_8.2';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='8.2';
+const TRACKER_VERSION='8.3';
 function installUpdateStatus(){
   const title=document.querySelector('.topbar-title');
   if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
   const banner=document.createElement('div');banner.id='update-banner';banner.className='update-banner hidden';banner.innerHTML='<span id="update-message">Nuovo aggiornamento disponibile.</span><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button>';document.body.appendChild(banner);
   const showUpdate=message=>{document.getElementById('update-message').textContent=message||'Nuovo aggiornamento disponibile.';banner.classList.remove('hidden')};
-  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-2-task-nesting-css')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
+  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-3-pointer-drag')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
   return showUpdate;
 }
 const showTrackerUpdate=installUpdateStatus();
