@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v8-3-pointer-drag";
+const CACHE_NAME = "tracker-lavoro-cafe-v8-4-layout-notes";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",

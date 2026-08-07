@@ -460,7 +460,7 @@ input::placeholder,textarea::placeholder{color:#b49e90}
 .manage-details summary{color:var(--coffee);font-size:13px;cursor:pointer;list-style:none}
 .manage-details summary::-webkit-details-marker{display:none}
 .manage-details[open] summary{margin-bottom:14px}
-.manage-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.manage-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 .manage-grid .card{box-shadow:none;background:rgba(255,253,248,.58)}
 
 /* ---------- Dati e statistiche ---------- */
@@ -853,7 +853,7 @@ tbody tr:last-child td{border-bottom:0}
 <div class="form-bottom"><button class="btn btn-primary" id="btn-add" onclick="addRow()">+ aggiungi sessione</button><button class="btn" id="btn-repeat-last" type="button" onclick="repeatLastSession()">↻ ripeti ultima sessione</button></div>
 </div>
 <details class="manage-details">
-<summary>⚙ gestisci categorie e progetti</summary>
+<summary>⚙ gestisci categorie</summary>
 <div class="manage-grid">
 <div class="card">
 <div class="card-title">categorie</div>
@@ -861,7 +861,7 @@ tbody tr:last-child td{border-bottom:0}
 <input id="inp-new-cat" onkeydown="if(event.key==='Enter') addCategory()" placeholder="es. streaming, D&amp;D prep…" type="text"/>
 <button class="btn btn-primary" onclick="addCategory()">+</button>
 </div>
-<div id="cat-color-picker" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+<div id="cat-color-picker" style="display:flex;gap:6px;margin-top:12px;margin-bottom:10px;flex-wrap:wrap;">
 <div class="cat-color-dot selected" data-color="#EAD9C0" onclick="selectCatColor(this)" style="background:#EAD9C0;border:1px solid #D9C4A0;" title="Sabbia"></div>
 <div class="cat-color-dot" data-color="#F0D9EF" onclick="selectCatColor(this)" style="background:#F0D9EF;" title="Lilla"></div>
 <div class="cat-color-dot" data-color="#FCDCE1" onclick="selectCatColor(this)" style="background:#FCDCE1;" title="Rosa"></div>
@@ -871,14 +871,6 @@ tbody tr:last-child td{border-bottom:0}
 <div class="cat-color-dot" data-color="#C4DFE5" onclick="selectCatColor(this)" style="background:#C4DFE5;" title="Azzurro"></div>
 </div>
 <div class="cat-chips" id="cat-chips"><span class="cat-empty">nessuna ancora</span></div>
-</div>
-<div class="card">
-<div class="card-title">progetti</div>
-<div class="cat-add-row">
-<input id="inp-new-proj" onkeydown="if(event.key==='Enter') addProject()" placeholder="es. Among Us, Commissione Foxy…" type="text"/>
-<button class="btn btn-primary" onclick="addProject()">+</button>
-</div>
-<div class="cat-chips" id="proj-chips"><span class="cat-empty">nessuno ancora</span></div>
 </div>
 </div>
 </details>
@@ -1103,7 +1095,7 @@ function saveProjects(){
 function renderProjects(){
   const chips=document.getElementById('proj-chips');
   const active=projects.map((p,i)=>({p,i})).filter(x=>!x.p.archived);
-  chips.innerHTML=active.length===0?'<span class="cat-empty">nessuno ancora</span>':
+  if(chips) chips.innerHTML=active.length===0?'<span class="cat-empty">nessuno ancora</span>':
     active.map(x=>`<div class="cat-chip">${esc(x.p.name)}<button class="cat-chip-remove" onclick="removeProject(${x.i})">×</button></div>`).join('');
   renderProjSelector('inp-proj-chips');
 }
@@ -1748,8 +1740,8 @@ async function loadSessions(){
   const data=await api({action:'get'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
-    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.1'?'v8.3 · sincronizzato':'v8.3 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.1'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
-    if(data.backendVersion!=='8.1')toast('Tracker v8.3 attivo, ma Apps Script deve essere aggiornato.');
+    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.1'?'v8.4 · sincronizzato':'v8.4 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.1'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
+    if(data.backendVersion!=='8.1')toast('Tracker v8.4 attivo, ma Apps Script deve essere aggiornato.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
     // progetti
@@ -2115,7 +2107,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 #home-timer-slot #timer-setup{flex-direction:column;align-items:stretch!important}#home-timer-slot #timer-setup .field{width:100%}#home-timer-slot #timer-setup select,#home-timer-slot #timer-setup input{width:100%!important}
 #page-insert>.section-label:first-child{display:none}
 .home-notes textarea{width:100%;min-height:78px;margin-top:12px;border:0;outline:0;resize:vertical;background:#fff6df;border-radius:12px;padding:12px;color:var(--ink)}
-.home-note-actions{display:flex;justify-content:flex-end;margin-top:8px}.home-note-list{margin-top:8px}.home-note{padding:10px 0;border-bottom:1px solid var(--line)}.home-note:last-child{border:0}.home-note small{color:var(--muted)}
+.home-note-actions{display:flex;justify-content:flex-end;margin-top:8px}.home-note-list{margin:10px 0 12px}.home-note{padding:10px 0;border-bottom:1px solid var(--line)}.home-note:last-child{border:0}.home-note small{color:var(--muted)}
 .home-overview{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.home-stat{text-align:center;min-height:132px;padding:17px;border:1px solid var(--line);border-radius:17px;background:rgba(255,253,248,.9)}.home-stat-icon{display:block;color:var(--caramel);font-size:35px;line-height:1}.home-stat strong{display:block;margin:8px 0 3px;color:var(--espresso);font:500 25px 'Lora',serif}.home-stat span:last-child{color:var(--muted);font-size:11px}
 .task-editor{position:fixed;inset:0;z-index:150;display:grid;place-items:center;padding:20px;background:rgba(48,28,18,.54)}.task-editor.hidden{display:none}.task-editor-box{width:min(620px,100%);max-height:90vh;overflow:auto;padding:22px;border-radius:20px;background:var(--paper);box-shadow:0 25px 70px rgba(35,19,12,.32)}.task-editor-box h2{margin:0 0 15px;font:500 21px 'Lora',serif}.task-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.task-editor-grid .full{grid-column:1/-1}.task-editor-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
 @media(max-width:1050px){.home-grid{grid-template-columns:1fr}.home-stack{display:grid;grid-template-columns:1fr 1fr}.home-overview{grid-template-columns:repeat(3,1fr)}}
@@ -2133,6 +2125,9 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   const homeNav=document.createElement('div');homeNav.className='nav-icon active';homeNav.dataset.page='home';homeNav.title='Dashboard';homeNav.innerHTML='<svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="20"><path d="M3 11l9-8 9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg><span class="nav-label">Dashboard</span>';homeNav.onclick=()=>showPage('home');nav.insertBefore(homeNav,firstNav);firstNav.classList.remove('active');firstNav.querySelector('.nav-label').textContent='Sessioni';
   const mainBox=document.querySelector('.main-box');
   const home=document.createElement('div');home.className='page-section active';home.id='page-home';home.innerHTML='<div class="home-head"><div><h1>Dashboard</h1><p>Una vista leggera su ciò che conta oggi.</p></div><div class="home-actions"><button class="btn" type="button" onclick="showPage(\'insert\')">Registra sessione</button><button class="btn btn-primary" type="button" id="home-new-task">+ Nuova attività</button></div></div><div class="home-grid"><section><div class="home-card"><div class="home-card-head"><span>☕</span><h2>Piano di oggi</h2><button class="home-card-action" id="home-new-task-inline">Aggiungi attività +</button></div><div id="home-task-list"></div><div class="home-progress"><span id="home-progress-label">0 attività</span><div class="home-bar"><i id="home-progress-bar" style="width:0"></i></div><b id="home-progress-pct">0%</b></div></div><div class="home-overview"><div class="home-stat"><span class="home-stat-icon">◷</span><strong id="home-today-time">—</strong><span>lavoro oggi</span></div><div class="home-stat"><span class="home-stat-icon">✓</span><strong id="home-done-count">0</strong><span>attività completate</span></div><div class="home-stat"><span class="home-stat-icon">◎</span><strong id="home-session-count">0</strong><span>sessioni oggi</span></div></div></section><aside class="home-stack"><div class="home-card"><div class="home-card-head"><span>☕</span><h2>Sessione di lavoro</h2></div><div id="home-timer-slot"></div></div><div class="home-card home-notes"><div class="home-card-head"><span>✎</span><h2>Note rapide</h2></div><textarea id="home-note-input" placeholder="Scrivi qualcosa da ricordare…"></textarea><div class="home-note-actions"><button class="btn btn-sm" id="home-save-note">Salva nota</button></div><div class="home-note-list" id="home-note-list"></div></div></aside></div>';
+  const homeNoteList=home.querySelector('#home-note-list');
+  const homeNoteInput=home.querySelector('#home-note-input');
+  homeNoteInput.parentNode.insertBefore(homeNoteList,homeNoteInput);
   mainBox.insertBefore(home,mainBox.firstChild);document.getElementById('page-insert').classList.remove('active');
   const editor=document.createElement('div');editor.className='task-editor hidden';editor.id='task-editor';editor.innerHTML='<form class="task-editor-box" id="task-editor-form"><h2>Nuova attività</h2><input id="task-id" type="hidden"><div class="task-editor-grid"><div class="field full"><label>attività</label><input id="task-title" required placeholder="Cosa devi fare?"></div><div class="field"><label>progetto</label><select id="task-project"><option value="">— nessun progetto —</option></select></div><div class="field"><label>scadenza</label><input id="task-due" type="date"></div><div class="field"><label>durata prevista</label><input id="task-duration" placeholder="es. 1h 30m"></div><div class="field"><label>priorità</label><select id="task-priority"><option value="media">Media</option><option value="alta">Alta</option><option value="bassa">Bassa</option></select></div><div class="field full"><label>link VGen</label><input id="task-vgen" type="url" placeholder="https://…"></div><div class="field full"><label>link Notion</label><input id="task-notion" type="url" placeholder="https://…"></div><div class="field full"><label>link Drive o cartella</label><input id="task-drive" type="url" placeholder="https://…"></div></div><div class="task-editor-actions"><button class="btn" type="button" id="task-editor-cancel">Annulla</button><button class="btn btn-primary" type="submit">Salva attività</button></div></form>';document.body.appendChild(editor);
   const timerCard=document.getElementById('timer-card');document.getElementById('home-timer-slot').appendChild(timerCard);
@@ -2204,7 +2199,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
 <style>
 /* Gerarchia task, note sincronizzate e rifiniture tablet */
-html:before{content:'TRACKER_VERSION_8.3';display:none}
+html:before{content:'TRACKER_VERSION_8.4';display:none}
 #home-new-task-inline{display:none!important}
 .app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
 .update-banner{position:fixed;left:50%;bottom:24px;z-index:220;display:flex;align-items:center;gap:10px;width:min(520px,calc(100vw - 28px));padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:0 18px 45px rgba(42,24,15,.22);transform:translateX(-50%)}
@@ -2330,13 +2325,13 @@ html:before{content:'TRACKER_VERSION_8.3';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='8.3';
+const TRACKER_VERSION='8.4';
 function installUpdateStatus(){
   const title=document.querySelector('.topbar-title');
   if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
   const banner=document.createElement('div');banner.id='update-banner';banner.className='update-banner hidden';banner.innerHTML='<span id="update-message">Nuovo aggiornamento disponibile.</span><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button>';document.body.appendChild(banner);
   const showUpdate=message=>{document.getElementById('update-message').textContent=message||'Nuovo aggiornamento disponibile.';banner.classList.remove('hidden')};
-  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-3-pointer-drag')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
+  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-4-layout-notes')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
   return showUpdate;
 }
 const showTrackerUpdate=installUpdateStatus();
