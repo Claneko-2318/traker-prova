@@ -271,6 +271,7 @@ button{cursor:pointer}
 .config-status{margin-top:9px;font-size:11px;color:var(--muted)}
 .config-status.ok{color:var(--success)}
 .config-status.err{color:var(--danger)}
+.topbar-version{display:inline-flex;align-items:center;margin-left:8px;padding:3px 7px;border:1px solid var(--line);border-radius:999px;background:var(--paper-deep);color:var(--coffee);font-size:10px;font-weight:700;letter-spacing:.04em;vertical-align:middle}
 
 /* ---------- Contenuto ---------- */
 .main{
@@ -736,7 +737,7 @@ tbody tr:last-child td{border-bottom:0}
 <span class="nav-label">Impostazioni</span></div>
 <div class="nav-footer">Un giorno alla volta, un compito alla volta.</div></nav>
 <!-- header -->
-<header class="topbar"><div class="topbar-title">Tracker produttività</div><div class="topbar-right"><div class="hero-date"><div class="hero-date-icon">📅</div><div id="hero-date-text">Oggi</div><div id="hero-day-text">—</div><div id="hero-time-text">--:--:--</div></div><div class="status-dot"><div class="status-dot-circle" id="status-dot"></div><span id="status-text">—</span></div></div></header>
+<header class="topbar"><div class="topbar-title">Tracker produttività <span class="topbar-version">v8.8</span></div><div class="topbar-right"><div class="hero-date"><div class="hero-date-icon">📅</div><div id="hero-date-text">Oggi</div><div id="hero-day-text">—</div><div id="hero-time-text">--:--:--</div></div><div class="status-dot"><div class="status-dot-circle" id="status-dot"></div><span id="status-text">—</span></div></div></header>
 <!-- config panel -->
 <div class="config-panel hidden" id="config-panel">
 <p>Incolla qui l'URL della tua Web App.</p>
@@ -1741,8 +1742,8 @@ async function loadSessions(){
   const data=await api({action:'get'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
-    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.2'?'v8.6 · sincronizzato':'v8.6 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.2'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
-    if(data.backendVersion!=='8.2')toast('Tracker v8.6 attivo, ma Apps Script deve essere aggiornato.');
+    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.2'?'v8.8 · sincronizzato':'v8.8 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.2'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
+    if(data.backendVersion!=='8.2')toast('Tracker v8.8 attivo, ma Apps Script deve essere aggiornato.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
     // progetti
@@ -2200,7 +2201,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
 <style>
 /* Gerarchia task, note sincronizzate e rifiniture tablet */
-html:before{content:'TRACKER_VERSION_8.6';display:none}
+html:before{content:'TRACKER_VERSION_8.8';display:none}
 #home-new-task-inline{display:none!important}
 .app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
 .update-banner{position:fixed;left:50%;bottom:24px;z-index:220;display:flex;align-items:center;gap:10px;width:min(520px,calc(100vw - 28px));padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:0 18px 45px rgba(42,24,15,.22);transform:translateX(-50%)}
@@ -2214,6 +2215,7 @@ html:before{content:'TRACKER_VERSION_8.6';display:none}
 .task-tree-group.is-collapsed>.task-children{display:none}
 .task-children .home-task{padding:10px 4px}
 .task-title-line{display:flex;align-items:center;gap:6px}.task-title-line.has-children .home-task-title{cursor:pointer}.task-collapse-icon{display:inline-grid;place-items:center;width:18px;height:18px;border:0;background:transparent;color:var(--coffee);padding:0;font-size:12px}.task-edit-btn{border:0;background:transparent;color:var(--muted);padding:2px 4px;border-radius:6px;font-size:12px}.task-edit-btn:hover{background:var(--paper-deep);color:var(--coffee)}
+.home-chip.priority-high{background:#f8dddd;color:#9a3d3d}.home-chip.priority-medium{background:#f6ead2;color:#8a6331}.home-chip.priority-low{background:#dfeee4;color:#477356}.home-task-time.is-overdue{color:var(--danger);font-weight:600}
 .home-task.dragging{opacity:.38}.home-task.drag-target{outline:2px dashed var(--caramel);outline-offset:-3px;background:var(--paper-deep)}
 .home-task{grid-template-columns:24px 22px minmax(0,1fr) auto 30px!important}
 .task-drag-handle{display:grid;place-items:center;width:24px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:17px;line-height:1;cursor:grab;touch-action:none;user-select:none}.task-drag-handle:hover{background:var(--paper-deep);color:var(--coffee)}.task-drag-handle:active{cursor:grabbing}
@@ -2274,9 +2276,15 @@ html:before{content:'TRACKER_VERSION_8.6';display:none}
   function linkEntries(task){const links=task.links||{};return Array.isArray(links)?links.map(l=>[l.label,l.url]):Object.entries(links)}
   function taskRow(t,hasChildren){
     const links=linkEntries(t).map(([label,url])=>[String(label||'Link'),safeUrl(url)]).filter(x=>x[1]).map(x=>'<a class="home-chip link" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join('');
-    const today=new Date().toISOString().slice(0,10);
+    const localDateKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),now=new Date(),tomorrowDate=new Date(now);
+    tomorrowDate.setDate(now.getDate()+1);
+    const today=localDateKey(now),tomorrow=localDateKey(tomorrowDate);
+    const dueLabel=!t.due?'':t.due===today?'Oggi':t.due===tomorrow?'Domani':t.due.split('-').reverse().join('/');
+    const timeLabel=[dueLabel?'📅 '+dueLabel:'',t.duration?'◷ '+t.duration:''].filter(Boolean).join(' · ');
+    const priority=t.priority||'media',priorityLabel=priority==='alta'?'Priorità alta':priority==='bassa'?'Priorità bassa':'Priorità media';
+    const priorityChip='<span class="home-chip priority-'+(priority==='alta'?'high':priority==='bassa'?'low':'medium')+'">'+priorityLabel+'</span>';
     const title=hasChildren?'<div class="task-title-line has-children"><button class="task-collapse-icon" data-toggle-children="'+esc(t.id)+'" title="'+(t.collapsed?'Mostra':'Nascondi')+' sotto-task">'+(t.collapsed?'▸':'▾')+'</button><div class="home-task-title" data-toggle-children="'+esc(t.id)+'">'+esc(t.title)+'</div><button class="task-edit-btn" data-edit-task="'+esc(t.id)+'" title="Modifica task">✎</button></div>':'<div class="task-title-line"><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+esc(t.title)+'</div></div>';
-    return '<div class="home-task'+(t.done?' is-complete':'')+'" data-task-row="'+esc(t.id)+'"><button class="task-drag-handle" type="button" data-drag-task="'+esc(t.id)+'" title="Trascina per spostare" aria-label="Trascina per spostare">≡</button><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div>'+title+'<div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+links+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
+    return '<div class="home-task'+(t.done?' is-complete':'')+'" data-task-row="'+esc(t.id)+'"><button class="task-drag-handle" type="button" data-drag-task="'+esc(t.id)+'" title="Trascina per spostare" aria-label="Trascina per spostare">≡</button><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div>'+title+'<div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+priorityChip+links+'</div></div><span class="home-task-time'+(t.due&&t.due<today&&!t.done?' is-overdue':'')+'">'+esc(timeLabel)+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
   }
   function descendantsOf(taskId,tasks){const ids=new Set(),queue=[String(taskId)];while(queue.length){const parent=queue.shift();tasks.forEach(t=>{if(String(t.parentId||'')===parent&&!ids.has(String(t.id))){ids.add(String(t.id));queue.push(String(t.id))}})}return ids}
   function syncContainerCompletion(tasks,parentId){let parent=tasks.find(t=>String(t.id)===String(parentId));while(parent){const children=tasks.filter(t=>String(t.parentId||'')===String(parent.id));if(children.length){const done=children.every(t=>t.done);parent.done=done;parent.completedAt=done?(parent.completedAt||new Date().toISOString()):''}parent=parent.parentId?tasks.find(t=>String(t.id)===String(parent.parentId)):null}}
@@ -2336,13 +2344,13 @@ html:before{content:'TRACKER_VERSION_8.6';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='8.6';
+const TRACKER_VERSION='8.8';
 function installUpdateStatus(){
   const title=document.querySelector('.topbar-title');
   if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
   const banner=document.createElement('div');banner.id='update-banner';banner.className='update-banner hidden';banner.innerHTML='<span id="update-message">Nuovo aggiornamento disponibile.</span><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button>';document.body.appendChild(banner);
   const showUpdate=message=>{document.getElementById('update-message').textContent=message||'Nuovo aggiornamento disponibile.';banner.classList.remove('hidden')};
-  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-6-task-containers')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
+  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v8-8-visible-task-details')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
   return showUpdate;
 }
 const showTrackerUpdate=installUpdateStatus();
