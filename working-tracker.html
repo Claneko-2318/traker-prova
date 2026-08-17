@@ -737,7 +737,7 @@ tbody tr:last-child td{border-bottom:0}
 <span class="nav-label">Impostazioni</span></div>
 <div class="nav-footer">Un giorno alla volta, un compito alla volta.</div></nav>
 <!-- header -->
-<header class="topbar"><div class="topbar-title">Tracker produttività</div><div class="topbar-right"><div class="hero-date"><div class="hero-date-icon">📅</div><div id="hero-date-text">Oggi</div><div id="hero-day-text">—</div><div id="hero-time-text">--:--:--</div></div><span class="topbar-version">v9.2</span><div class="status-dot"><div class="status-dot-circle" id="status-dot"></div><span id="status-text">—</span></div></div></header>
+<header class="topbar"><div class="topbar-title">Tracker produttività</div><div class="topbar-right"><div class="hero-date"><div class="hero-date-icon">📅</div><div id="hero-date-text">Oggi</div><div id="hero-day-text">—</div><div id="hero-time-text">--:--:--</div></div><span class="topbar-version">v9.3</span><div class="status-dot"><div class="status-dot-circle" id="status-dot"></div><span id="status-text">—</span></div></div></header>
 <!-- config panel -->
 <div class="config-panel hidden" id="config-panel">
 <p>Incolla qui l'URL della tua Web App.</p>
@@ -899,7 +899,7 @@ tbody tr:last-child td{border-bottom:0}
 <div class="weekly-summary-grid">
 <div class="weekly-summary-item"><span>tempo totale</span><strong id="week-total">—</strong></div>
 <div class="weekly-summary-item"><span>sessioni</span><strong id="week-count">—</strong></div>
-<div class="weekly-summary-item"><span>media mensile</span><strong id="week-average">—</strong></div>
+<div class="weekly-summary-item"><span>media giornaliera del mese</span><strong id="week-average">—</strong></div>
 <div class="weekly-summary-item"><span>progetto principale</span><strong id="week-project">—</strong></div>
 </div>
 <div class="weekly-summary-compare" id="week-compare">—</div>
@@ -1307,7 +1307,7 @@ function getFiltered(y,m){const p=getPrefix(y,m);return sessions.filter(s=>s.dat
 function calcStreak(){const days=new Set(sessions.map(s=>s.date));let streak=0;const d=new Date(todayStr+'T12:00:00');if(!days.has(todayStr))d.setDate(d.getDate()-1);while(true){const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(!days.has(key))break;streak++;d.setDate(d.getDate()-1);}return streak;}
 function weekStartKey(dateStr){const d=new Date(dateStr+'T12:00:00');if(Number.isNaN(d.getTime()))return'';d.setDate(d.getDate()-((d.getDay()+6)%7));return dateKeyLocal(d);}
 function averageWeeklyMinutes(list){const totals={};list.forEach(s=>{const key=weekStartKey(s.date);if(key)totals[key]=(totals[key]||0)+Number(s.minutes||0);});const values=Object.values(totals);return values.length?Math.round(values.reduce((a,n)=>a+n,0)/values.length):0;}
-function averageMonthlyMinutes(list){const totals={};list.forEach(s=>{const key=String(s.date||'').slice(0,7);if(/^\d{4}-\d{2}$/.test(key))totals[key]=(totals[key]||0)+Number(s.minutes||0);});const values=Object.values(totals);return values.length?Math.round(values.reduce((a,n)=>a+n,0)/values.length):0;}
+function averageDailyMinutesForMonth(y,m){const now=new Date(todayStr+'T12:00:00'),monthStart=new Date(y,m,1),daysInMonth=new Date(y,m+1,0).getDate();if(monthStart>now)return 0;const divisor=y===now.getFullYear()&&m===now.getMonth()?now.getDate():daysInMonth;const total=getFiltered(y,m).reduce((a,s)=>a+Number(s.minutes||0),0);return divisor?Math.round(total/divisor):0;}
 
 function updateStats(filtered){
   document.getElementById('month-label').textContent=MESI[viewMonth]+' '+viewYear;
@@ -1775,8 +1775,8 @@ async function loadSessions(){
   const data=await api({action:'get'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
-    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.2'?'v9.2 · sincronizzato':'v9.2 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.2'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
-    if(data.backendVersion!=='8.2')toast('Tracker v9.2 attivo, ma Apps Script deve essere aggiornato.');
+    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.2'?'v9.3 · sincronizzato':'v9.3 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.2'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
+    if(data.backendVersion!=='8.2')toast('Tracker v9.3 attivo, ma Apps Script deve essere aggiornato.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
     // progetti
@@ -1892,10 +1892,10 @@ function renderCurrentWeekSummary(){
   const sunday=new Date(monday);sunday.setDate(monday.getDate()+6);const pm=new Date(monday);pm.setDate(monday.getDate()-7);const ps=new Date(monday);ps.setDate(monday.getDate()-1);
   const start=dateKeyLocal(monday),end=dateKeyLocal(sunday),pstart=dateKeyLocal(pm),pend=dateKeyLocal(ps);
   const current=sessions.filter(s=>s.date>=start&&s.date<=end),previous=sessions.filter(s=>s.date>=pstart&&s.date<=pend);
-  const total=current.reduce((a,s)=>a+Number(s.minutes||0),0),prevTotal=previous.reduce((a,s)=>a+Number(s.minutes||0),0),monthlyAverage=averageMonthlyMinutes(sessions);
+  const total=current.reduce((a,s)=>a+Number(s.minutes||0),0),prevTotal=previous.reduce((a,s)=>a+Number(s.minutes||0),0),monthlyDailyAverage=averageDailyMinutesForMonth(viewYear,viewMonth);
   const projectMinutes={};current.forEach(s=>{const list=!s.projects?[]:(Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(x=>x.trim()).filter(Boolean));list.forEach(n=>projectMinutes[n]=(projectMinutes[n]||0)+Number(s.minutes||0));});
   const top=Object.entries(projectMinutes).sort((a,b)=>b[1]-a[1])[0];
-  document.getElementById('week-range').textContent=shortDateIt(monday)+' – '+shortDateIt(sunday);document.getElementById('week-total').textContent=total?toHours(total):'—';document.getElementById('week-count').textContent=current.length||'—';document.getElementById('week-average').textContent=monthlyAverage?toHours(monthlyAverage):'—';document.getElementById('week-project').textContent=top?top[0]:'—';
+  document.getElementById('week-range').textContent=shortDateIt(monday)+' – '+shortDateIt(sunday);document.getElementById('week-total').textContent=total?toHours(total):'—';document.getElementById('week-count').textContent=current.length||'—';document.getElementById('week-average').textContent=monthlyDailyAverage?toHours(monthlyDailyAverage):'—';document.getElementById('week-project').textContent=top?top[0]:'—';
   const c=document.getElementById('week-compare');if(total===0&&prevTotal===0)c.textContent='Nessuna sessione registrata questa settimana.';else if(prevTotal===0)c.textContent='Prima settimana con attività registrata: '+toHours(total)+'.';else{const diff=total-prevTotal,pct=Math.abs(Math.round(diff/prevTotal*100));c.textContent=diff===0?'Stesso tempo della settimana precedente.':diff>0?'↑ '+pct+'% rispetto alla settimana precedente.':'↓ '+pct+'% rispetto alla settimana precedente.';}
 }
 function sessionSignature(s){const ps=!s.projects?[]:(Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(x=>x.trim()).filter(Boolean));return[normalizeDate(s.date),s.category||'',Number(s.minutes||0),s.pomodori||'',s.durata_pomodoro||'',s.note||'',s.mood||'',ps.slice().sort().join('|'),s.task||''].join('¦');}
@@ -2234,7 +2234,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
 <style>
 /* Gerarchia task, note sincronizzate e rifiniture tablet */
-html:before{content:'TRACKER_VERSION_9.2';display:none}
+html:before{content:'TRACKER_VERSION_9.3';display:none}
 #home-new-task-inline{display:none!important}
 .app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
 .update-banner{position:fixed;left:50%;bottom:24px;z-index:220;display:flex;align-items:center;gap:10px;width:min(520px,calc(100vw - 28px));padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:0 18px 45px rgba(42,24,15,.22);transform:translateX(-50%)}
@@ -2437,13 +2437,13 @@ html:before{content:'TRACKER_VERSION_9.2';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.2';
+const TRACKER_VERSION='9.3';
 function installUpdateStatus(){
   const title=document.querySelector('.topbar-title');
   if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
   const banner=document.createElement('div');banner.id='update-banner';banner.className='update-banner hidden';banner.innerHTML='<span id="update-message">Nuovo aggiornamento disponibile.</span><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button>';document.body.appendChild(banner);
   const showUpdate=message=>{document.getElementById('update-message').textContent=message||'Nuovo aggiornamento disponibile.';banner.classList.remove('hidden')};
-  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v9-2-stopwatch-stats')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
+  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes('v9-3-daily-month-average')).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
   return showUpdate;
 }
 const showTrackerUpdate=installUpdateStatus();
