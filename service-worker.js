@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v8-9-daily-goal";
+const CACHE_NAME = "tracker-lavoro-cafe-v9-0-goal-layout";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",
