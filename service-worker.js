@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v9-1-goal-spacing";
+const CACHE_NAME = "tracker-lavoro-cafe-v9-2-stopwatch-stats";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",
