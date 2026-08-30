@@ -1970,10 +1970,10 @@ function exportCSV(){
   const filtered=getFiltered(viewYear,viewMonth);
   if(filtered.length===0){toast('Nessuna sessione in questo mese.');return;}
   const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
-  const header=['Data','Categoria','Minuti','Durata','Pomodori','Durata pomodoro','Note','Umore','Progetti','Task'];
+  const header=['Data','Categoria','Minuti','Durata','Pomodori','Durata pomodoro','Task','Umore','Progetti'];
   const rows=filtered.map(s=>{
     const projs=!s.projects?'' : (Array.isArray(s.projects)?s.projects.join(', '):String(s.projects));
-    return[fmt(s.date),s.category||'',Number(s.minutes),toHours(Number(s.minutes)),s.pomodori||'',s.durata_pomodoro||'',s.note||'',s.mood||'',projs,s.task||''].map(q).join(';');
+    return[fmt(s.date),s.category||'',Number(s.minutes),toHours(Number(s.minutes)),s.pomodori||'',s.durata_pomodoro||'',s.task||'',s.mood||'',projs].map(q).join(';');
   });
   const csv='\uFEFF'+header.map(q).join(';')+'\n'+rows.join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
@@ -2055,7 +2055,7 @@ function exportPDF(){
 
   // intestazioni
   const cols=[14,40,68,92,118,168];
-  const headers=['Data','Categoria','Durata','Dettaglio','Note','Umore'];
+  const headers=['Data','Categoria','Durata','Dettaglio','Task','Umore'];
   doc.setFontSize(8);doc.setTextColor(156,122,85);
   headers.forEach((h,i)=>doc.text(h,cols[i],y));
   y+=2;doc.setDrawColor(217,196,160);doc.line(14,y,196,y);y+=5;
@@ -2076,7 +2076,7 @@ function exportPDF(){
     doc.text((s.category||'—').slice(0,16),cols[1],textY);
     doc.text(toHours(Number(s.minutes)),cols[2],textY);
     doc.text(s.pomodori?s.pomodori+'x'+s.durata_pomodoro:'—',cols[3],textY);
-    doc.text(s.note?(s.note.length>24?s.note.slice(0,24)+'...':s.note):'—',cols[4],textY);
+    doc.text(s.task?(s.task.length>24?s.task.slice(0,24)+'...':s.task):'—',cols[4],textY);
     const moodText={'😴':'stanca','😐':'media','🙂':'bene','⚡':'top'}[s.mood]||s.mood||'—';
     doc.text(moodText,cols[5],textY);
     // linea separatrice DOPO il testo, in fondo alla riga
@@ -2154,6 +2154,9 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   const TASK_KEY='focus_work_tasks_v1',NOTE_KEY='focus_quick_notes_v1';
   let workTasks=[];let quickNotes=[];
   try{workTasks=JSON.parse(localStorage.getItem(TASK_KEY)||'[]');if(!Array.isArray(workTasks))workTasks=[];}catch(e){workTasks=[]}
+  function taskDateKey(value){const d=new Date(value);return Number.isNaN(d.getTime())?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+  function clearCompletedFromPreviousDays(tasks){const today=taskDateKey(new Date());return(Array.isArray(tasks)?tasks:[]).filter(t=>!t.done||(t.completedAt&&taskDateKey(t.completedAt)>=today))}
+  workTasks=clearCompletedFromPreviousDays(workTasks);localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));
   try{quickNotes=JSON.parse(localStorage.getItem(NOTE_KEY)||'[]');if(!Array.isArray(quickNotes))quickNotes=[];}catch(e){quickNotes=[]}
   const nav=document.querySelector('.icon-sidebar');
   const firstNav=nav.querySelector('.nav-icon[data-page]');
@@ -2178,7 +2181,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   const originalBuildBackup=window.buildBackup;window.buildBackup=function(){const b=originalBuildBackup();b.tasks=workTasks;b.quickNotes=quickNotes;b.timerPreferences={longBreak:document.getElementById('timer-pausa-lunga').value,longBreakEvery:document.getElementById('timer-pausa-lunga-ogni').value};return b};
   window.importWorkDashboardBackup=function(backup){if(Array.isArray(backup.tasks)){workTasks=backup.tasks;localStorage.setItem(TASK_KEY,JSON.stringify(workTasks))}if(Array.isArray(backup.quickNotes)){quickNotes=backup.quickNotes;localStorage.setItem(NOTE_KEY,JSON.stringify(quickNotes))}if(backup.timerPreferences){const lb=document.getElementById('timer-pausa-lunga'),le=document.getElementById('timer-pausa-lunga-ogni');if(lb&&backup.timerPreferences.longBreak)lb.value=backup.timerPreferences.longBreak;if(le&&backup.timerPreferences.longBreakEvery)le.value=backup.timerPreferences.longBreakEvery}renderTasks();renderNotes()};
   window.getWorkDashboardTasks=function(){return workTasks.slice()};
-  window.replaceWorkTasks=function(tasks){workTasks=Array.isArray(tasks)?tasks.slice():[];localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions()};
+  window.replaceWorkTasks=function(tasks){const incoming=Array.isArray(tasks)?tasks.slice():[],cleaned=clearCompletedFromPreviousDays(incoming),removed=cleaned.length!==incoming.length;workTasks=cleaned;localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions();if(removed&&SCRIPT_URL)api({action:'saveTasks',tasks:workTasks}).then(r=>{if(r&&r.ok)toast('Task completate del giorno precedente eliminate.')})};
   window.workTaskApi={list:function(){return workTasks},save:saveTasks,open:openEditor,close:closeEditor};
   renderTasks();renderNotes();renderHomeStats();showPage('home');
 })();
@@ -2250,8 +2253,9 @@ html:before{content:'TRACKER_VERSION_9.3';display:none}
 .task-title-line{display:flex;align-items:center;gap:6px}.task-title-line.has-children .home-task-title{cursor:pointer}.task-collapse-icon{display:inline-grid;place-items:center;width:18px;height:18px;border:0;background:transparent;color:var(--coffee);padding:0;font-size:12px}.task-edit-btn{border:0;background:transparent;color:var(--muted);padding:2px 4px;border-radius:6px;font-size:12px}.task-edit-btn:hover{background:var(--paper-deep);color:var(--coffee)}
 .home-chip.priority-high{background:#f8dddd;color:#9a3d3d}.home-chip.priority-medium{background:#f6ead2;color:#8a6331}.home-chip.priority-low{background:#dfeee4;color:#477356}.home-task-time.is-overdue{color:var(--danger);font-weight:600}
 .home-task.dragging{opacity:.38}.home-task.drag-target{outline:2px dashed var(--caramel);outline-offset:-3px;background:var(--paper-deep)}
-.home-task{grid-template-columns:24px 22px minmax(0,1fr) auto 30px!important}
+.home-task{grid-template-columns:24px 22px minmax(0,1fr) auto 54px 30px!important}
 .task-drag-handle{display:grid;place-items:center;width:24px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:17px;line-height:1;cursor:grab;touch-action:none;user-select:none}.task-drag-handle:hover{background:var(--paper-deep);color:var(--coffee)}.task-drag-handle:active{cursor:grabbing}
+.task-order-controls{display:flex;gap:2px;align-items:center}.task-order-btn{display:grid;place-items:center;width:25px;height:28px;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;line-height:1}.task-order-btn:hover:not(:disabled){border-color:var(--line);background:var(--paper-deep);color:var(--coffee)}.task-order-btn:disabled{opacity:.25;cursor:default}
 .task-root-drop{display:none;margin:7px 0;padding:9px;border:1px dashed var(--caramel);border-radius:12px;color:var(--coffee);background:var(--paper-warm);text-align:center;font-size:10px}.task-root-drop.drag-target{background:var(--paper-deep);outline:0}.task-list-dragging>.task-root-drop{display:block}
 .home-task-check{display:grid!important;place-items:center!important;padding:0!important;line-height:1!important;font-size:12px!important;text-align:center!important}
 #page-insert .mode-pom,#page-insert .mode-time{margin-top:12px}
@@ -2273,9 +2277,9 @@ html:before{content:'TRACKER_VERSION_9.3';display:none}
   .update-banner{bottom:86px}
 }
 @media(max-width:560px){
-  .home-task{grid-template-columns:24px 22px minmax(0,1fr) 28px!important}
+  .home-task{grid-template-columns:24px 22px minmax(0,1fr) 54px 28px!important}
   .home-task-time{grid-column:3;justify-self:start}
-  .home-task-delete{grid-column:4;grid-row:1}
+  .task-order-controls{grid-column:4;grid-row:1}.home-task-delete{grid-column:5;grid-row:1}
   .task-children{margin-left:12px;padding-left:8px;padding-right:3px}
   #page-insert .field-pom,#page-insert .field-dur{flex:1 1 calc(50% - 6px)}
   #page-insert .field-custom{flex:1 1 100%}
@@ -2307,7 +2311,10 @@ html:before{content:'TRACKER_VERSION_9.3';display:none}
 
   function safeUrl(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
   function linkEntries(task){const links=task.links||{};return Array.isArray(links)?links.map(l=>[l.label,l.url]):Object.entries(links)}
-  function taskRow(t,hasChildren){
+  function siblingTasks(tasks,parentId,visibleOnly){const parent=String(parentId||'');return tasks.filter(x=>String(x.parentId||'')===parent&&(!visibleOnly||!x.done)).sort(taskOrderComparator(tasks))}
+  function taskOrderComparator(tasks){return(a,b)=>{const ao=Number.isFinite(Number(a.manualOrder))?Number(a.manualOrder):null,bo=Number.isFinite(Number(b.manualOrder))?Number(b.manualOrder):null;if(ao!==null||bo!==null){if(ao===null)return 1;if(bo===null)return-1;if(ao!==bo)return ao-bo}const due=(a.due||'9999').localeCompare(b.due||'9999');return due||tasks.indexOf(a)-tasks.indexOf(b)}}
+  function initializeSiblingOrder(tasks,parentId){siblingTasks(tasks,parentId,false).forEach((t,index)=>{t.manualOrder=index})}
+  function taskRow(t,hasChildren,tasks){
     const links=linkEntries(t).map(([label,url])=>[String(label||'Link'),safeUrl(url)]).filter(x=>x[1]).map(x=>'<a class="home-chip link" href="'+esc(x[1])+'" target="_blank" rel="noopener noreferrer">'+esc(x[0])+' ↗</a>').join('');
     const localDateKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),now=new Date(),tomorrowDate=new Date(now);
     tomorrowDate.setDate(now.getDate()+1);
@@ -2317,7 +2324,9 @@ html:before{content:'TRACKER_VERSION_9.3';display:none}
     const priority=t.priority||'media',priorityLabel=priority==='alta'?'Priorità alta':priority==='bassa'?'Priorità bassa':'Priorità media';
     const priorityChip='<span class="home-chip priority-'+(priority==='alta'?'high':priority==='bassa'?'low':'medium')+'">'+priorityLabel+'</span>';
     const title=hasChildren?'<div class="task-title-line has-children"><button class="task-collapse-icon" data-toggle-children="'+esc(t.id)+'" title="'+(t.collapsed?'Mostra':'Nascondi')+' sotto-task">'+(t.collapsed?'▸':'▾')+'</button><div class="home-task-title" data-toggle-children="'+esc(t.id)+'">'+esc(t.title)+'</div><button class="task-edit-btn" data-edit-task="'+esc(t.id)+'" title="Modifica task">✎</button></div>':'<div class="task-title-line"><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+esc(t.title)+'</div></div>';
-    return '<div class="home-task'+(t.done?' is-complete':'')+'" data-task-row="'+esc(t.id)+'"><button class="task-drag-handle" type="button" data-drag-task="'+esc(t.id)+'" title="Trascina per spostare" aria-label="Trascina per spostare">≡</button><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div>'+title+'<div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+priorityChip+links+'</div></div><span class="home-task-time'+(t.due&&t.due<today&&!t.done?' is-overdue':'')+'">'+esc(timeLabel)+'</span><button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
+    const siblings=siblingTasks(tasks,t.parentId||'',!document.querySelector('.completed-toggle')?.classList.contains('active')),position=siblings.findIndex(x=>String(x.id)===String(t.id));
+    const orderControls='<div class="task-order-controls"><button class="task-order-btn" type="button" data-order-task="'+esc(t.id)+'" data-order-direction="up" title="Sposta su" aria-label="Sposta task su"'+(position<=0?' disabled':'')+'>▲</button><button class="task-order-btn" type="button" data-order-task="'+esc(t.id)+'" data-order-direction="down" title="Sposta giù" aria-label="Sposta task giù"'+(position<0||position>=siblings.length-1?' disabled':'')+'>▼</button></div>';
+    return '<div class="home-task'+(t.done?' is-complete':'')+'" data-task-row="'+esc(t.id)+'"><button class="task-drag-handle" type="button" data-drag-task="'+esc(t.id)+'" title="Trascina per spostare" aria-label="Trascina per spostare">≡</button><button class="home-task-check" data-toggle-task="'+esc(t.id)+'" title="'+(t.done?'Riapri':'Completa')+'">'+(t.done?'✓':'')+'</button><div>'+title+'<div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+priorityChip+links+'</div></div><span class="home-task-time'+(t.due&&t.due<today&&!t.done?' is-overdue':'')+'">'+esc(timeLabel)+'</span>'+orderControls+'<button class="home-task-delete" data-delete-task="'+esc(t.id)+'" title="Elimina attività" aria-label="Elimina attività">×</button></div>';
   }
   function descendantsOf(taskId,tasks){const ids=new Set(),queue=[String(taskId)];while(queue.length){const parent=queue.shift();tasks.forEach(t=>{if(String(t.parentId||'')===parent&&!ids.has(String(t.id))){ids.add(String(t.id));queue.push(String(t.id))}})}return ids}
   function syncContainerCompletion(tasks,parentId){let parent=tasks.find(t=>String(t.id)===String(parentId));while(parent){const children=tasks.filter(t=>String(t.parentId||'')===String(parent.id));if(children.length){const done=children.every(t=>t.done);parent.done=done;parent.completedAt=done?(parent.completedAt||new Date().toISOString()):''}parent=parent.parentId?tasks.find(t=>String(t.id)===String(parent.parentId)):null}}
@@ -2327,17 +2336,18 @@ html:before{content:'TRACKER_VERSION_9.3';display:none}
     list.querySelectorAll('[data-toggle-children]').forEach(e=>e.onclick=event=>{event.stopPropagation();const t=taskApi.list().find(x=>String(x.id)===String(e.dataset.toggleChildren));if(t){t.collapsed=!t.collapsed;taskApi.save()}});
     list.querySelectorAll('[data-edit-task]').forEach(e=>e.onclick=()=>taskApi.open(taskApi.list().find(x=>String(x.id)===String(e.dataset.editTask))));
     list.querySelectorAll('[data-delete-task]').forEach(b=>b.onclick=()=>{const tasks=taskApi.list(),index=tasks.findIndex(t=>String(t.id)===String(b.dataset.deleteTask));if(index<0)return;const task=tasks[index],descendants=descendantsOf(task.id,tasks);const extra=descendants.size?' Verranno eliminate anche '+descendants.size+' sotto-task.':'';if(!confirm('Eliminare definitivamente l’attività “'+task.title+'”?'+extra))return;const parentId=task.parentId||'';for(let i=tasks.length-1;i>=0;i--)if(String(tasks[i].id)===String(task.id)||descendants.has(String(tasks[i].id)))tasks.splice(i,1);if(parentId)syncContainerCompletion(tasks,parentId);taskApi.save();toast(descendants.size?'Task e sotto-task eliminate.':'Attività eliminata.')});
+    list.querySelectorAll('[data-order-task]').forEach(b=>b.onclick=()=>{const tasks=taskApi.list(),task=tasks.find(t=>String(t.id)===String(b.dataset.orderTask));if(!task)return;initializeSiblingOrder(tasks,task.parentId||'');const hideCompleted=!document.querySelector('.completed-toggle')?.classList.contains('active'),siblings=siblingTasks(tasks,task.parentId||'',hideCompleted),index=siblings.findIndex(t=>String(t.id)===String(task.id)),otherIndex=b.dataset.orderDirection==='up'?index-1:index+1;if(index<0||otherIndex<0||otherIndex>=siblings.length)return;const other=siblings[otherIndex],currentOrder=task.manualOrder;task.manualOrder=other.manualOrder;other.manualOrder=currentOrder;taskApi.save();toast('Ordine delle task aggiornato.')});
     list.querySelectorAll('[data-drag-task]').forEach(handle=>{handle.onpointerdown=e=>{if(e.button!==undefined&&e.button!==0)return;e.preventDefault();const draggedId=handle.dataset.dragTask,source=handle.closest('[data-task-row]');source.classList.add('dragging');list.classList.add('task-list-dragging');handle.setPointerCapture?.(e.pointerId);let targetId=null;const highlight=(x,y)=>{list.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'));const under=document.elementFromPoint(x,y);const root=under&&under.closest('.task-root-drop');const row=under&&under.closest('[data-task-row]');if(root){root.classList.add('drag-target');targetId=''}else if(row&&row.dataset.taskRow!==draggedId){row.classList.add('drag-target');targetId=row.dataset.taskRow}else targetId=null};const move=ev=>{ev.preventDefault();highlight(ev.clientX,ev.clientY)};const finish=ev=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',finish);document.removeEventListener('pointercancel',cancel);source.classList.remove('dragging');list.classList.remove('task-list-dragging');list.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'));if(targetId!==null)moveTask(draggedId,targetId)};const cancel=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',finish);document.removeEventListener('pointercancel',cancel);source.classList.remove('dragging');list.classList.remove('task-list-dragging');list.querySelectorAll('.drag-target').forEach(el=>el.classList.remove('drag-target'))};document.addEventListener('pointermove',move,{passive:false});document.addEventListener('pointerup',finish,{once:true});document.addEventListener('pointercancel',cancel,{once:true})}});
   }
-  function moveTask(taskId,parentId){const tasks=taskApi.list(),moving=tasks.find(t=>String(t.id)===String(taskId));if(!moving||String(taskId)===String(parentId))return;let cursor=tasks.find(t=>String(t.id)===String(parentId));while(cursor){if(String(cursor.id)===String(taskId)){toast('Non puoi spostare una task dentro una sua sotto-task.');return}cursor=tasks.find(t=>String(t.id)===String(cursor.parentId||''))}const oldParent=moving.parentId||'';moving.parentId=parentId||'';delete moving.type;if(oldParent)syncContainerCompletion(tasks,oldParent);if(parentId)syncContainerCompletion(tasks,parentId);taskApi.save();toast(parentId?'Task spostata.':'Task riportata al livello principale.')}
+  function moveTask(taskId,parentId){const tasks=taskApi.list(),moving=tasks.find(t=>String(t.id)===String(taskId));if(!moving||String(taskId)===String(parentId))return;let cursor=tasks.find(t=>String(t.id)===String(parentId));while(cursor){if(String(cursor.id)===String(taskId)){toast('Non puoi spostare una task dentro una sua sotto-task.');return}cursor=tasks.find(t=>String(t.id)===String(cursor.parentId||''))}const oldParent=moving.parentId||'';moving.parentId=parentId||'';delete moving.type;initializeSiblingOrder(tasks,oldParent);initializeSiblingOrder(tasks,parentId||'');moving.manualOrder=Math.max(-1,...siblingTasks(tasks,parentId||'',false).filter(t=>String(t.id)!==String(moving.id)).map(t=>Number(t.manualOrder)||0))+1;if(oldParent)syncContainerCompletion(tasks,oldParent);if(parentId)syncContainerCompletion(tasks,parentId);taskApi.save();toast(parentId?'Task spostata.':'Task riportata al livello principale.')}
   window.renderWorkTasksGeneric=function(tasks){
     tasks.forEach(t=>{if(!t.parentId)t.parentId='';delete t.type});
     const list=document.getElementById('home-task-list');
     const showCompleted=document.querySelector('.completed-toggle')?.classList.contains('active');
     const visible=tasks.filter(t=>showCompleted||!t.done);
     const visibleIds=new Set(visible.map(t=>String(t.id)));
-    const roots=visible.filter(t=>!t.parentId||!visibleIds.has(String(t.parentId))).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
-    function branch(t){const allChildren=tasks.filter(x=>String(x.parentId||'')===String(t.id)),children=visible.filter(x=>String(x.parentId||'')===String(t.id)).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));return '<section class="task-tree-group'+(t.collapsed?' is-collapsed':'')+'">'+taskRow(t,allChildren.length>0)+'<div class="task-children">'+children.map(branch).join('')+'</div></section>'}
+    const roots=visible.filter(t=>!t.parentId||!visibleIds.has(String(t.parentId))).sort(taskOrderComparator(tasks));
+    function branch(t){const allChildren=tasks.filter(x=>String(x.parentId||'')===String(t.id)),children=visible.filter(x=>String(x.parentId||'')===String(t.id)).sort(taskOrderComparator(tasks));return '<section class="task-tree-group'+(t.collapsed?' is-collapsed':'')+'">'+taskRow(t,allChildren.length>0,tasks)+'<div class="task-children">'+children.map(branch).join('')+'</div></section>'}
     const html=roots.map(branch).join('');
     list.innerHTML='<div class="task-root-drop">Trascina qui per riportare la task al livello principale</div>'+(html||'<div class="home-empty">Nessuna attività aperta.</div>');
     bindTaskActions(list);
@@ -2349,10 +2359,11 @@ html:before{content:'TRACKER_VERSION_9.3';display:none}
     e.preventDefault();
     const id=document.getElementById('task-id').value||String(Date.now()),tasks=taskApi.list(),old=tasks.find(t=>String(t.id)===String(id)),links={};
     document.querySelectorAll('.generic-link-row').forEach((row,index)=>{const label=row.querySelector('.generic-link-label').value.trim()||('Link '+(index+1)),url=row.querySelector('.generic-link-url').value.trim();if(safeUrl(url)){let key=label,n=2;while(links[key])key=label+' '+n++;links[key]=safeUrl(url)}});
-    const task={id,title:document.getElementById('task-title').value.trim(),parentId:document.getElementById('task-parent').value,project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links,done:old?.done||false,completedAt:old?.completedAt||'',createdAt:old?.createdAt||new Date().toISOString()};
+    const task={id,title:document.getElementById('task-title').value.trim(),parentId:document.getElementById('task-parent').value,project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links,done:old?.done||false,completedAt:old?.completedAt||'',createdAt:old?.createdAt||new Date().toISOString(),manualOrder:old?.manualOrder};
     if(!task.title)return;
     const oldParent=old?.parentId||'';
-    if(old)Object.assign(old,task);else tasks.unshift(task);
+    if(old)Object.assign(old,task);else{initializeSiblingOrder(tasks,task.parentId);task.manualOrder=Math.max(-1,...siblingTasks(tasks,task.parentId,false).map(t=>Number(t.manualOrder)||0))+1;tasks.unshift(task)}
+    if(old&&String(oldParent)!==String(task.parentId)){initializeSiblingOrder(tasks,oldParent);initializeSiblingOrder(tasks,task.parentId);old.manualOrder=Math.max(-1,...siblingTasks(tasks,task.parentId,false).filter(t=>String(t.id)!==String(old.id)).map(t=>Number(t.manualOrder)||0))+1}
     if(oldParent)syncContainerCompletion(tasks,oldParent);
     if(task.parentId)syncContainerCompletion(tasks,task.parentId);
     taskApi.save();taskApi.close();
