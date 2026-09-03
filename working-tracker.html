@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- BUILD: tracker-cafe-three-features-2026-07-30 -->
+<!-- BUILD: tracker-cafe-twitch-2026-09-03 -->
 
 
 <html lang="it">
 <head>
-<meta name="tracker-build" content="three-features-2026-07-30"/>
+<meta name="tracker-build" content="twitch-2026-09-03"/>
 
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
@@ -1775,8 +1775,8 @@ async function loadSessions(){
   const data=await api({action:'get'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
-    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.2'?'v9.3 · sincronizzato':'v9.3 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.2'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
-    if(data.backendVersion!=='8.2')toast('Tracker v9.3 attivo, ma Apps Script deve essere aggiornato.');
+    if(versionBadge){versionBadge.textContent=data.backendVersion==='8.3'?'v9.3 · sincronizzato':'v9.3 · Apps Script da aggiornare';versionBadge.title=data.backendVersion==='8.3'?'Tracker e Apps Script aggiornati':'Pubblica una nuova versione del deployment Apps Script';}
+    if(data.backendVersion!=='8.3')toast('Tracker v9.3 attivo, ma Apps Script deve essere aggiornato.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
     // progetti
@@ -1826,6 +1826,12 @@ async function loadSessions(){
       }else{
         api({action:'saveNotes',notes:localNotes}).then(r=>{if(r&&r.ok)toast('Note locali sincronizzate con Google Sheets.')});
       }
+    }
+    // dati Twitch condivisi: Google Sheets e' la fonte comune tra i dispositivi.
+    // Se il modulo Twitch non e' ancora inizializzato, i dati restano in attesa.
+    if(Array.isArray(data.twitchLives)&&Array.isArray(data.twitchReports)){
+      window.__twitchRemoteData={lives:data.twitchLives,reports:data.twitchReports};
+      if(window.replaceTwitchData)window.replaceTwitchData(data.twitchLives,data.twitchReports);
     }
     // umore
     if(data.moods&&Object.keys(data.moods).length>0){
@@ -2448,7 +2454,7 @@ html:before{content:'TRACKER_VERSION_9.3';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.3';
+const TRACKER_VERSION='9.4';
 function installUpdateStatus(){
   const title=document.querySelector('.topbar-title');
   if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
@@ -2471,5 +2477,465 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+<style>
+/* ================================================================
+   TWITCH TRACKER — crescita e storico
+   Area separata dalla programmazione (gestita in Notion).
+   ================================================================ */
+.tw-page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}
+.tw-page-head h1{margin:0;color:var(--espresso);font:500 27px 'Lora',serif}
+.tw-page-head p{margin:5px 0 0;color:var(--muted);max-width:700px}
+.tw-head-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.tw-tabs{display:flex;gap:6px;margin:0 0 18px;padding:5px;border:1px solid var(--line);border-radius:15px;background:rgba(255,253,248,.72);width:max-content;max-width:100%}
+.tw-tab{border:0;border-radius:11px;padding:9px 14px;background:transparent;color:var(--muted);font-size:12px;font-weight:600}
+.tw-tab:hover{background:var(--paper-deep);color:var(--coffee)}
+.tw-tab.active{background:var(--espresso);color:#fff8ef;box-shadow:0 6px 15px rgba(59,36,24,.16)}
+.tw-panel{display:none}.tw-panel.active{display:block}
+.tw-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.tw-filter-group{display:flex;gap:6px;flex-wrap:wrap}
+.tw-filter{border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:var(--paper);color:var(--muted);font-size:11px;font-weight:600}
+.tw-filter:hover{border-color:var(--line-strong);color:var(--coffee)}
+.tw-filter.active{border-color:var(--coffee);background:var(--paper-deep);color:var(--espresso)}
+.tw-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.tw-summary{min-height:122px;padding:17px;border:1px solid var(--line);border-radius:18px;background:rgba(255,253,248,.94);box-shadow:var(--shadow-soft)}
+.tw-summary-label{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.tw-summary-value{margin:10px 0 3px;color:var(--espresso);font:500 27px 'Lora',serif}
+.tw-summary-note{color:var(--muted);font-size:11px}
+.tw-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.65fr);gap:18px;align-items:start}
+.tw-card{padding:18px;border:1px solid var(--line);border-radius:19px;background:rgba(255,253,248,.94);box-shadow:var(--shadow-soft)}
+.tw-card+.tw-card{margin-top:18px}
+.tw-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.tw-card-head h2{margin:0;color:var(--espresso);font:italic 18px 'Lora',serif}
+.tw-card-head p{margin:3px 0 0;color:var(--muted);font-size:11px}
+.tw-metric-switch{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.tw-metric-btn{border:0;border-radius:9px;padding:6px 9px;background:transparent;color:var(--muted);font-size:10px;font-weight:600}
+.tw-metric-btn:hover{background:var(--paper-deep);color:var(--coffee)}
+.tw-metric-btn.active{background:var(--paper-deep);color:var(--espresso)}
+.tw-chart-wrap{position:relative;height:310px;margin-top:12px}
+.tw-chart-legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:10px}
+.tw-legend-dot,.tw-legend-diamond{display:inline-block;width:9px;height:9px;margin-right:5px;background:var(--caramel)}
+.tw-legend-dot{border-radius:50%}.tw-legend-diamond{background:var(--sage);transform:rotate(45deg);border-radius:2px}
+.tw-compare-table{width:100%;border-collapse:collapse;margin-top:9px;font-size:11px}
+.tw-compare-table th,.tw-compare-table td{padding:9px 6px;border-bottom:1px solid rgba(226,207,186,.72);text-align:right}
+.tw-compare-table th:first-child,.tw-compare-table td:first-child{text-align:left;color:var(--muted)}
+.tw-compare-table thead th{color:var(--coffee);font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+.tw-compare-table tbody tr:last-child td{border-bottom:0}
+.tw-insight{margin-top:13px;padding:12px;border:1px dashed var(--line-strong);border-radius:13px;background:var(--paper-warm);color:var(--ink-soft);font-size:11px;line-height:1.6}
+.tw-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 0 10px}
+.tw-section-title h2{margin:0;color:var(--espresso);font:500 18px 'Lora',serif}
+.tw-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:var(--shadow-soft)}
+.tw-table{width:100%;border-collapse:collapse;min-width:780px;font-size:11px}
+.tw-table th{padding:10px 12px;background:var(--paper-warm);color:var(--muted);font-size:9px;letter-spacing:.06em;text-align:left;text-transform:uppercase}
+.tw-table td{padding:11px 12px;border-top:1px solid rgba(226,207,186,.7);vertical-align:middle}
+.tw-table tbody tr{cursor:pointer;transition:.15s ease}.tw-table tbody tr:hover{background:#fff8ef}
+.tw-live-title{font-weight:600;color:var(--espresso)}
+.tw-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:var(--paper-deep);color:var(--coffee);font-size:9px;font-weight:700;white-space:nowrap}
+.tw-badge.spontaneous{background:#e5ebdf;color:#5d7055}.tw-badge.scheduled{background:#f3e2d1;color:#8a5b37}
+.tw-empty{padding:34px 18px;text-align:center;color:var(--muted)}
+.tw-empty strong{display:block;margin-bottom:5px;color:var(--coffee);font:500 17px 'Lora',serif}
+.tw-empty p{max-width:540px;margin:0 auto;font-size:11px;line-height:1.6}
+.tw-live-filters{display:grid;grid-template-columns:minmax(220px,1fr) 180px 190px;gap:9px;margin-bottom:12px}
+.tw-live-filters input,.tw-live-filters select{width:100%;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:var(--paper);color:var(--ink);outline:0}
+.tw-live-filters input:focus,.tw-live-filters select:focus{border-color:var(--caramel);box-shadow:0 0 0 3px rgba(198,147,104,.12)}
+.tw-report-list{display:flex;flex-direction:column;gap:12px}
+.tw-report-card{padding:17px;border:1px solid var(--line);border-radius:17px;background:var(--paper);box-shadow:var(--shadow-soft);cursor:pointer;transition:.15s ease}
+.tw-report-card:hover{border-color:var(--line-strong);transform:translateY(-1px)}
+.tw-report-period{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.tw-report-card h3{margin:5px 0 6px;color:var(--espresso);font:500 17px 'Lora',serif}
+.tw-report-card p{margin:0;color:var(--ink-soft);font-size:11px;line-height:1.6}
+.tw-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:14px 0}
+.tw-detail-stat{padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--paper-warm)}
+.tw-detail-stat span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em}.tw-detail-stat strong{display:block;margin-top:4px;color:var(--espresso);font-size:14px}
+.tw-detail-section{margin-top:14px}.tw-detail-section h4{margin:0 0 6px;color:var(--coffee);font-size:11px;text-transform:uppercase;letter-spacing:.06em}.tw-detail-section p{margin:0;white-space:pre-wrap;color:var(--ink-soft);font-size:12px;line-height:1.65}.tw-detail-section ul{margin:6px 0 0;padding-left:18px;color:var(--ink-soft);font-size:12px;line-height:1.6}
+.tw-import-preview{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.tw-import-line{padding:10px;border:1px solid var(--line);border-radius:11px;background:var(--paper-warm)}.tw-import-line span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em}.tw-import-line strong{display:block;margin-top:3px;color:var(--espresso);font-size:12px;word-break:break-word}.tw-import-warning{padding:10px 12px;border:1px solid #d8b98d;border-radius:11px;background:#fff4dc;color:#76542e;font-size:11px}.tw-import-error{padding:10px 12px;border:1px solid #d9a9a0;border-radius:11px;background:#fbe9e5;color:#85453d;font-size:11px}
+.tw-text-btn{border:0;background:transparent;color:var(--coffee);font-size:11px;text-decoration:underline;text-underline-offset:3px}
+.tw-danger-btn{color:var(--danger)!important}
+@media(max-width:1120px){.tw-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tw-layout{grid-template-columns:1fr}.tw-layout>aside{display:grid;grid-template-columns:1fr 1fr;gap:18px}.tw-layout>aside .tw-card{margin:0}}
+@media(max-width:900px){.tw-page-head{align-items:flex-start;flex-direction:column}.tw-head-actions{width:100%;justify-content:flex-start}.tw-summary-grid{grid-template-columns:1fr 1fr}.tw-layout>aside{display:block}.tw-layout>aside .tw-card+.tw-card{margin-top:14px}.tw-chart-wrap{height:270px}.tw-live-filters{grid-template-columns:1fr}.tw-tabs{width:100%}.tw-tab{flex:1}.tw-detail-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.tw-summary-grid{grid-template-columns:1fr}.tw-summary{min-height:auto}.tw-toolbar{align-items:flex-start;flex-direction:column}.tw-card{padding:14px}.tw-card-head{flex-direction:column}.tw-metric-switch{justify-content:flex-start}.tw-chart-wrap{height:230px}.tw-detail-grid,.tw-import-preview{grid-template-columns:1fr}.tw-head-actions .btn{flex:1 1 100%}}
+</style>
+<script>
+(function installTwitchTracker(){
+  const STORAGE_KEY='focus_twitch_tracker_v1_live';
+  let twitchChart=null;
+  let currentPeriod='3m';
+  let currentType='all';
+  let currentMetric='average_viewers';
+  let pendingImport=null;
+
+  const EMPTY_STORE={version:1,lives:[],reports:[]};
+  function emptyStore(){return JSON.parse(JSON.stringify(EMPTY_STORE))}
+
+  function readStore(){
+    try{
+      const value=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
+      if(value&&typeof value==='object'){
+        return {version:1,lives:Array.isArray(value.lives)?value.lives:[],reports:Array.isArray(value.reports)?value.reports:[]};
+      }
+      return emptyStore();
+    }catch(e){return emptyStore()}
+  }
+  let store=readStore();
+  function saveStore(){localStorage.setItem(STORAGE_KEY,JSON.stringify(store))}
+  async function syncStore(){
+    saveStore();
+    if(!SCRIPT_URL)return{ok:false,localOnly:true};
+    const result=await api({action:'saveTwitchData',lives:store.lives,reports:store.reports});
+    if(!result||!result.ok){
+      toast('Dati Twitch salvati solo su questo dispositivo. Aggiorna o controlla Apps Script.');
+      return{ok:false};
+    }
+    return result;
+  }
+  function n(v){const x=Number(v);return Number.isFinite(x)?x:null}
+  function dateOnly(v){const s=String(v||'').trim();return /^\d{4}-\d{2}-\d{2}/.test(s)?s.slice(0,10):''}
+  function slug(v){return String(v||'live').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)||'live'}
+  function arr(v){return Array.isArray(v)?v.filter(x=>x!==null&&x!==undefined&&String(x).trim()!=='').map(String):[]}
+  function fmtNumber(v,digits=1){return Number.isFinite(v)?v.toLocaleString('it-IT',{minimumFractionDigits:0,maximumFractionDigits:digits}):'—'}
+  function fmtMinutes(v){const min=Math.max(0,Math.round(Number(v)||0)),h=Math.floor(min/60),m=min%60;return h?(h+'h'+(m?' '+m+'m':'')):(m+'m')}
+  function fmtDate(v){const d=dateOnly(v);if(!d)return'—';const [y,m,day]=d.split('-');return day+'/'+m+'/'+y}
+  function formatPeriod(report){const a=dateOnly(report.period_start),b=dateOnly(report.period_end);if(a&&b)return fmtDate(a)+' — '+fmtDate(b);return a?('Dal '+fmtDate(a)):b?('Fino al '+fmtDate(b)):'Periodo libero'}
+  function streamTypeLabel(v){return v==='spontaneous'?'Co-working':'Programmata'}
+  function metric(obj,key){return n(obj?.metrics?.[key]??obj?.[key])}
+  function isCoworking(live){return live.stream_type==='spontaneous'||String(live.format||'').toLowerCase().includes('co-work')||String(live.format||'').toLowerCase().includes('cowork')}
+  function safeText(v){return String(v??'')}
+  function firstValue(){for(const v of arguments){if(v!==undefined&&v!==null&&String(v).trim()!=='')return v}return''}
+
+  function normalizeLive(raw){
+    const base=raw.live&&typeof raw.live==='object'?raw.live:raw;
+    const metricsRaw=raw.metrics&&typeof raw.metrics==='object'?raw.metrics:(base.metrics&&typeof base.metrics==='object'?base.metrics:{});
+    const analysisRaw=raw.analysis&&typeof raw.analysis==='object'?raw.analysis:(base.analysis&&typeof base.analysis==='object'?base.analysis:{});
+    const date=dateOnly(firstValue(base.date,base.stream_date,raw.date));
+    const title=safeText(firstValue(base.title,base.name,raw.title)).trim();
+    if(!date)throw new Error('Manca una data valida nel formato YYYY-MM-DD.');
+    if(!title)throw new Error('Manca il titolo della live.');
+    let type=safeText(firstValue(base.stream_type,base.type,base.schedule_type,raw.stream_type)).toLowerCase();
+    if(['spontanea','spontaneous','coworking','co-working','morning'].includes(type))type='spontaneous';
+    else if(['programmata','scheduled','planned'].includes(type))type='scheduled';
+    else type=isCoworking({stream_type:type,format:firstValue(base.format,base.category)})?'spontaneous':'scheduled';
+    const live={
+      id:safeText(firstValue(raw.id,base.id,'live_'+date+'_'+slug(title))),
+      date,
+      title,
+      stream_type:type,
+      format:safeText(firstValue(base.format,base.category,raw.format)).trim()||'Non specificato',
+      model:safeText(firstValue(base.model,base.avatar,raw.model)).trim(),
+      start_time:safeText(firstValue(base.start_time,base.time,raw.start_time)).trim(),
+      duration_minutes:n(firstValue(base.duration_minutes,base.duration,raw.duration_minutes))||0,
+      activity:safeText(firstValue(base.activity,raw.activity)).trim(),
+      background:safeText(firstValue(base.background,base.background_game,raw.background)).trim(),
+      metrics:{
+        average_viewers:n(firstValue(metricsRaw.average_viewers,metricsRaw.avg_viewers,metricsRaw.averageViewers)),
+        peak_viewers:n(firstValue(metricsRaw.peak_viewers,metricsRaw.max_viewers,metricsRaw.peakViewers)),
+        followers_gained:n(firstValue(metricsRaw.followers_gained,metricsRaw.new_followers,metricsRaw.followers)),
+        unique_viewers:n(firstValue(metricsRaw.unique_viewers,metricsRaw.uniqueViewers)),
+        chatters:n(firstValue(metricsRaw.chatters,metricsRaw.unique_chatters,metricsRaw.uniqueChatters))
+      },
+      analysis:{
+        summary:safeText(firstValue(analysisRaw.summary,analysisRaw.recap)).trim(),
+        positives:arr(firstValue(analysisRaw.positives,analysisRaw.improvements,[])),
+        issues:arr(firstValue(analysisRaw.issues,analysisRaw.to_watch,analysisRaw.problems,[])),
+        observations:arr(firstValue(analysisRaw.observations,analysisRaw.notes,[])),
+        next_steps:arr(firstValue(analysisRaw.next_steps,analysisRaw.nextSteps,analysisRaw.experiments,[]))
+      },
+      imported_at:new Date().toISOString()
+    };
+    return live;
+  }
+
+  function normalizeReport(raw){
+    const base=raw.report&&typeof raw.report==='object'?raw.report:raw;
+    const start=dateOnly(firstValue(base.period_start,base.start_date,raw.period_start));
+    const end=dateOnly(firstValue(base.period_end,base.end_date,raw.period_end));
+    const title=safeText(firstValue(base.title,raw.title,'Report Twitch')).trim();
+    if(!start&&!end)throw new Error('Il report deve indicare almeno una data di inizio o fine periodo.');
+    return{
+      id:safeText(firstValue(raw.id,base.id,'report_'+(start||'start')+'_'+(end||'end')+'_'+slug(title))),
+      period_start:start,
+      period_end:end,
+      title,
+      summary:safeText(firstValue(base.summary,raw.summary)).trim(),
+      improvements:arr(firstValue(base.improvements,base.positives,[])),
+      observations:arr(firstValue(base.observations,base.findings,[])),
+      experiments:arr(firstValue(base.experiments,base.changes,[])),
+      next_steps:arr(firstValue(base.next_steps,base.nextSteps,[])),
+      body:safeText(firstValue(base.body,base.full_report,raw.body)).trim(),
+      imported_at:new Date().toISOString()
+    }
+  }
+
+  function detectAndNormalize(raw){
+    if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('Il file JSON non contiene un oggetto valido.');
+    const kind=safeText(firstValue(raw.record_type,raw.kind,raw.type)).toLowerCase();
+    if(kind==='report'||raw.report||raw.period_start||raw.period_end)return{kind:'report',data:normalizeReport(raw)};
+    return{kind:'live',data:normalizeLive(raw)};
+  }
+
+  const nav=document.querySelector('.icon-sidebar');
+  const spacer=nav?.querySelector('.nav-icon-spacer');
+  if(nav&&!nav.querySelector('[data-page="twitch"]')){
+    const item=document.createElement('div');
+    item.className='nav-icon';item.dataset.page='twitch';item.title='Twitch';
+    item.innerHTML='<svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="20"><rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="M9 9v5"></path><path d="M15 9v5"></path><path d="M8 19l-2 2"></path><path d="M16 19l2 2"></path></svg><span class="nav-label">Twitch</span>';
+    item.onclick=()=>showPage('twitch');
+    nav.insertBefore(item,spacer||null);
+  }
+
+  const page=document.createElement('div');page.className='page-section';page.id='page-twitch';
+  page.innerHTML=`
+    <div class="tw-page-head">
+      <div><h1>Twitch</h1><p>Storico, metriche e progressi reali. La programmazione resta separata su Notion.</p></div>
+      <div class="tw-head-actions"><button class="btn" type="button" id="tw-backup-btn">Esporta backup</button><button class="btn btn-primary" type="button" id="tw-import-btn">＋ Importa recap</button><input id="tw-import-file" type="file" accept="application/json,.json" hidden></div>
+    </div>
+    <div class="tw-tabs" role="tablist">
+      <button class="tw-tab active" type="button" data-tw-tab="overview">Panoramica</button>
+      <button class="tw-tab" type="button" data-tw-tab="lives">Live</button>
+      <button class="tw-tab" type="button" data-tw-tab="reports">Report</button>
+    </div>
+
+    <section class="tw-panel active" data-tw-panel="overview">
+      <div class="tw-toolbar">
+        <div class="tw-filter-group" aria-label="Periodo"><button class="tw-filter" data-period="30d" type="button">30 giorni</button><button class="tw-filter active" data-period="3m" type="button">3 mesi</button><button class="tw-filter" data-period="6m" type="button">6 mesi</button><button class="tw-filter" data-period="1y" type="button">1 anno</button><button class="tw-filter" data-period="all" type="button">Tutto</button></div>
+        <div class="tw-filter-group" aria-label="Tipo di live"><button class="tw-filter active" data-stream-filter="all" type="button">Tutte</button><button class="tw-filter" data-stream-filter="scheduled" type="button">Programmate</button><button class="tw-filter" data-stream-filter="spontaneous" type="button">Co-working</button></div>
+      </div>
+      <div class="tw-summary-grid">
+        <div class="tw-summary"><div class="tw-summary-label">Live</div><div class="tw-summary-value" id="tw-s-live">—</div><div class="tw-summary-note" id="tw-s-live-note">nel periodo selezionato</div></div>
+        <div class="tw-summary"><div class="tw-summary-label">Ore trasmesse</div><div class="tw-summary-value" id="tw-s-hours">—</div><div class="tw-summary-note">tempo effettivo in diretta</div></div>
+        <div class="tw-summary"><div class="tw-summary-label">Spettatori medi</div><div class="tw-summary-value" id="tw-s-avg">—</div><div class="tw-summary-note">media ponderata sulla durata</div></div>
+        <div class="tw-summary"><div class="tw-summary-label">Follower ottenuti</div><div class="tw-summary-value" id="tw-s-follow">—</div><div class="tw-summary-note">somma delle live importate</div></div>
+      </div>
+      <div class="tw-layout">
+        <div>
+          <div class="tw-card">
+            <div class="tw-card-head"><div><h2>Andamento live per live</h2><p>Ogni punto è una diretta: programmate e co-working restano distinguibili.</p></div><div class="tw-metric-switch"><button class="tw-metric-btn active" data-metric="average_viewers" type="button">Spettatori medi</button><button class="tw-metric-btn" data-metric="peak_viewers" type="button">Picco</button><button class="tw-metric-btn" data-metric="followers_gained" type="button">Follower</button><button class="tw-metric-btn" data-metric="duration_minutes" type="button">Durata</button></div></div>
+            <div class="tw-chart-wrap"><canvas id="tw-main-chart" aria-label="Andamento delle live Twitch" role="img"></canvas><div class="tw-empty hidden" id="tw-chart-empty"><strong>Ancora nessun dato</strong><p>Importa il primo recap JSON dopo una live e qui inizierà a comparire l'andamento.</p></div></div>
+            <div class="tw-chart-legend"><span><i class="tw-legend-dot"></i>Programmata</span><span><i class="tw-legend-diamond"></i>Co-working spontanea</span></div>
+          </div>
+          <div class="tw-section-title"><h2>Ultime live</h2><button class="tw-text-btn" type="button" id="tw-show-all-lives">Vedi archivio completo</button></div>
+          <div class="tw-table-wrap" id="tw-recent-wrap"></div>
+        </div>
+        <aside>
+          <div class="tw-card">
+            <div class="tw-card-head"><div><h2>Programmate vs co-working</h2><p>Un confronto descrittivo, senza obiettivi da raggiungere.</p></div></div>
+            <div id="tw-compare"></div>
+          </div>
+          <div class="tw-card">
+            <div class="tw-card-head"><div><h2>Ultimo report</h2><p>Il punto della situazione costruito insieme a ChatGPT.</p></div></div>
+            <div id="tw-last-report"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="tw-panel" data-tw-panel="lives">
+      <div class="tw-live-filters"><input id="tw-live-search" type="search" placeholder="Cerca titolo, format, attività…"><select id="tw-live-type"><option value="all">Tutte le live</option><option value="scheduled">Programmate</option><option value="spontaneous">Co-working</option></select><select id="tw-live-format"><option value="all">Tutti i format</option></select></div>
+      <div class="tw-table-wrap" id="tw-live-archive"></div>
+    </section>
+
+    <section class="tw-panel" data-tw-panel="reports">
+      <div class="tw-section-title" style="margin-top:0"><div><h2>Progressi nel tempo</h2><p style="margin:4px 0 0;color:var(--muted);font-size:11px">I report possono coprire un mese, alcune live o qualsiasi periodo utile.</p></div><button class="btn btn-primary" type="button" id="tw-import-report-btn">＋ Importa report</button></div>
+      <div class="tw-report-list" id="tw-report-list"></div>
+    </section>`;
+  document.querySelector('.main-box')?.appendChild(page);
+
+  const importModal=document.createElement('div');
+  importModal.className='modal-overlay hidden';importModal.id='tw-import-modal';
+  importModal.innerHTML='<div class="modal" onclick="event.stopPropagation()"><h2 id="tw-import-title">Importa recap</h2><p id="tw-import-copy" style="margin:-8px 0 12px;color:var(--muted);font-size:12px"></p><div id="tw-import-preview"></div><div class="modal-actions"><button class="btn" type="button" id="tw-import-cancel">Annulla</button><button class="btn btn-primary" type="button" id="tw-import-confirm">Importa</button></div></div>';
+  document.body.appendChild(importModal);
+
+  const detailModal=document.createElement('div');
+  detailModal.className='modal-overlay hidden';detailModal.id='tw-detail-modal';
+  detailModal.innerHTML='<div class="modal" onclick="event.stopPropagation()"><div id="tw-detail-content"></div><div class="modal-actions"><button class="btn tw-danger-btn" type="button" id="tw-detail-delete">Elimina</button><button class="btn btn-primary" type="button" id="tw-detail-close">Chiudi</button></div></div>';
+  document.body.appendChild(detailModal);
+  let detailRef=null;
+
+  const originalShowPage=window.showPage;
+  window.showPage=function(name){originalShowPage(name);if(name==='twitch'){renderAll();requestAnimationFrame(renderChart)}};
+
+  function cutoffDate(period){
+    if(period==='all')return null;
+    const d=new Date();d.setHours(0,0,0,0);
+    if(period==='30d')d.setDate(d.getDate()-30);
+    if(period==='3m')d.setMonth(d.getMonth()-3);
+    if(period==='6m')d.setMonth(d.getMonth()-6);
+    if(period==='1y')d.setFullYear(d.getFullYear()-1);
+    return d;
+  }
+  function filteredLives(){
+    const cut=cutoffDate(currentPeriod);
+    return store.lives.filter(l=>{
+      const d=new Date(l.date+'T00:00:00');
+      const dateOk=!cut||(!Number.isNaN(d.getTime())&&d>=cut);
+      const typeOk=currentType==='all'||(currentType==='spontaneous'?isCoworking(l):!isCoworking(l));
+      return dateOk&&typeOk;
+    }).sort((a,b)=>(a.date+(a.start_time||'')).localeCompare(b.date+(b.start_time||'')));
+  }
+  function weightedAverage(lives,key){
+    let total=0,weight=0;
+    lives.forEach(l=>{const value=key==='duration_minutes'?n(l.duration_minutes):metric(l,key);if(value===null)return;const w=Math.max(1,n(l.duration_minutes)||1);total+=value*w;weight+=w});
+    return weight?total/weight:null;
+  }
+  function sumMetric(lives,key){let seen=false,total=0;lives.forEach(l=>{const v=metric(l,key);if(v!==null){seen=true;total+=v}});return seen?total:null}
+  function averageMetric(lives,key){const vals=lives.map(l=>metric(l,key)).filter(v=>v!==null);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null}
+  function summary(lives){
+    const minutes=lives.reduce((sum,l)=>sum+(n(l.duration_minutes)||0),0);
+    return{count:lives.length,minutes,avg:weightedAverage(lives,'average_viewers'),followers:sumMetric(lives,'followers_gained'),peak:averageMetric(lives,'peak_viewers'),followersPerLive:lives.length?(sumMetric(lives,'followers_gained')??0)/lives.length:null};
+  }
+
+  function renderSummary(){
+    const lives=filteredLives(),s=summary(lives);
+    document.getElementById('tw-s-live').textContent=s.count||'0';
+    document.getElementById('tw-s-hours').textContent=s.minutes?fmtMinutes(s.minutes):'0m';
+    document.getElementById('tw-s-avg').textContent=s.avg===null?'—':fmtNumber(s.avg,1);
+    document.getElementById('tw-s-follow').textContent=s.followers===null?'—':('+'+fmtNumber(s.followers,0));
+    document.getElementById('tw-s-live-note').textContent=currentType==='all'?'nel periodo selezionato':(currentType==='spontaneous'?'solo co-working spontanee':'solo live programmate');
+  }
+
+  function renderChart(){
+    const canvas=document.getElementById('tw-main-chart');if(!canvas||!window.Chart)return;
+    const lives=filteredLives().filter(l=>currentMetric==='duration_minutes'?(n(l.duration_minutes)!==null):(metric(l,currentMetric)!==null));
+    const empty=document.getElementById('tw-chart-empty');
+    if(twitchChart){twitchChart.destroy();twitchChart=null}
+    if(!lives.length){canvas.style.display='none';empty.classList.remove('hidden');return}
+    canvas.style.display='block';empty.classList.add('hidden');
+    const css=getComputedStyle(document.documentElement),coffee=css.getPropertyValue('--hazelnut').trim()||'#987158',scheduled=css.getPropertyValue('--caramel').trim()||'#c69368',spontaneous=css.getPropertyValue('--sage').trim()||'#8f9d84',grid=css.getPropertyValue('--line').trim()||'#e2cfba',text=css.getPropertyValue('--muted').trim()||'#927868';
+    const labels=lives.map(l=>{const d=new Date(l.date+'T00:00:00');return d.toLocaleDateString('it-IT',{day:'2-digit',month:'short'})});
+    const values=lives.map(l=>currentMetric==='duration_minutes'?n(l.duration_minutes):metric(l,currentMetric));
+    const metricNames={average_viewers:'Spettatori medi',peak_viewers:'Picco spettatori',followers_gained:'Follower ottenuti',duration_minutes:'Durata (min)'};
+    twitchChart=new Chart(canvas,{type:'line',data:{labels,datasets:[{label:metricNames[currentMetric],data:values,borderColor:coffee,borderWidth:2,tension:0,fill:false,pointRadius:5,pointHoverRadius:7,pointBackgroundColor:lives.map(l=>isCoworking(l)?spontaneous:scheduled),pointBorderColor:lives.map(l=>isCoworking(l)?spontaneous:scheduled),pointStyle:lives.map(l=>isCoworking(l)?'rectRot':'circle')}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:(items)=>{const l=lives[items[0].dataIndex];return l.title+' · '+fmtDate(l.date)},afterLabel:(ctx)=>{const l=lives[ctx.dataIndex];return streamTypeLabel(isCoworking(l)?'spontaneous':'scheduled')+(l.format?' · '+l.format:'')}}}},scales:{x:{grid:{display:false},ticks:{color:text,maxRotation:0,autoSkip:true,maxTicksLimit:8,font:{size:10}}},y:{beginAtZero:true,grid:{color:grid},ticks:{color:text,font:{size:10}}}}}});
+  }
+
+  function compareRows(){
+    const base=store.lives.filter(l=>{const cut=cutoffDate(currentPeriod),d=new Date(l.date+'T00:00:00');return !cut||(!Number.isNaN(d.getTime())&&d>=cut)});
+    const scheduled=base.filter(l=>!isCoworking(l)),cowork=base.filter(isCoworking),a=summary(scheduled),b=summary(cowork);
+    const cell=(v,kind)=>v===null||v===undefined?'—':kind==='time'?fmtMinutes(v):kind==='follow'?('+'+fmtNumber(v,1)):fmtNumber(v,1);
+    return '<table class="tw-compare-table"><thead><tr><th></th><th>Programmate</th><th>Co-working</th></tr></thead><tbody><tr><td>Live</td><td>'+a.count+'</td><td>'+b.count+'</td></tr><tr><td>Durata media</td><td>'+cell(a.count?a.minutes/a.count:null,'time')+'</td><td>'+cell(b.count?b.minutes/b.count:null,'time')+'</td></tr><tr><td>Spettatori medi</td><td>'+cell(a.avg)+'</td><td>'+cell(b.avg)+'</td></tr><tr><td>Picco medio</td><td>'+cell(a.peak)+'</td><td>'+cell(b.peak)+'</td></tr><tr><td>Follower / live</td><td>'+cell(a.followersPerLive,'follow')+'</td><td>'+cell(b.followersPerLive,'follow')+'</td></tr></tbody></table>'+
+      (!a.count||!b.count?'<div class="tw-insight">Il confronto diventerà più significativo quando saranno presenti live di entrambi i tipi nello stesso periodo.</div>':'<div class="tw-insight">Questi dati descrivono una differenza, non dimostrano da soli che il tipo di live ne sia la causa. Orario, durata, contenuto e modello possono incidere.</div>');
+  }
+  function renderCompare(){document.getElementById('tw-compare').innerHTML=compareRows()}
+
+  function liveTable(lives,limit){
+    const list=[...lives].sort((a,b)=>(b.date+(b.start_time||'')).localeCompare(a.date+(a.start_time||'')));
+    const rows=(limit?list.slice(0,limit):list).map(l=>'<tr data-live-id="'+esc(l.id)+'"><td>'+fmtDate(l.date)+'</td><td><div class="tw-live-title">'+esc(l.title)+'</div><div style="color:var(--muted);font-size:9px;margin-top:2px">'+esc(l.start_time||'')+'</div></td><td><span class="tw-badge '+(isCoworking(l)?'spontaneous':'scheduled')+'">'+(isCoworking(l)?'Co-working':'Programmata')+'</span></td><td>'+esc(l.format||'—')+'</td><td>'+fmtMinutes(l.duration_minutes)+'</td><td>'+fmtNumber(metric(l,'average_viewers'),1)+'</td><td>'+fmtNumber(metric(l,'peak_viewers'),0)+'</td><td>'+(metric(l,'followers_gained')===null?'—':('+'+fmtNumber(metric(l,'followers_gained'),0)))+'</td></tr>').join('');
+    if(!rows)return'<div class="tw-empty"><strong>Nessuna live importata</strong><p>Quando mi passerai lo screenshot del recap Twitch, potremo analizzarlo e generare il JSON da importare qui.</p></div>';
+    return'<table class="tw-table"><thead><tr><th>Data</th><th>Live</th><th>Tipo</th><th>Format</th><th>Durata</th><th>Media</th><th>Picco</th><th>Follow</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+  function bindLiveRows(root){root.querySelectorAll('[data-live-id]').forEach(row=>row.onclick=()=>openLive(row.dataset.liveId))}
+  function renderRecent(){const root=document.getElementById('tw-recent-wrap');root.innerHTML=liveTable(filteredLives(),5);bindLiveRows(root)}
+
+  function renderArchive(){
+    const query=document.getElementById('tw-live-search').value.trim().toLowerCase(),type=document.getElementById('tw-live-type').value,format=document.getElementById('tw-live-format').value;
+    const formats=[...new Set(store.lives.map(l=>l.format).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'it'));
+    const formatSel=document.getElementById('tw-live-format'),old=formatSel.value;
+    formatSel.innerHTML='<option value="all">Tutti i format</option>'+formats.map(f=>'<option value="'+esc(f)+'">'+esc(f)+'</option>').join('');
+    if([...formatSel.options].some(o=>o.value===old))formatSel.value=old;
+    const selectedFormat=formatSel.value;
+    const list=store.lives.filter(l=>{
+      const hay=[l.title,l.format,l.activity,l.background,l.model].join(' ').toLowerCase();
+      const typeOk=type==='all'||(type==='spontaneous'?isCoworking(l):!isCoworking(l));
+      const formatOk=selectedFormat==='all'||l.format===selectedFormat;
+      return(!query||hay.includes(query))&&typeOk&&formatOk;
+    });
+    const root=document.getElementById('tw-live-archive');root.innerHTML=liveTable(list,0);bindLiveRows(root);
+  }
+
+  function renderReports(){
+    const list=[...store.reports].sort((a,b)=>(b.period_end||b.period_start||'').localeCompare(a.period_end||a.period_start||''));
+    const root=document.getElementById('tw-report-list');
+    root.innerHTML=list.length?list.map(r=>'<article class="tw-report-card" data-report-id="'+esc(r.id)+'"><div class="tw-report-period">'+esc(formatPeriod(r))+'</div><h3>'+esc(r.title)+'</h3><p>'+esc(r.summary||r.body||'Report importato.').slice(0,320)+(String(r.summary||r.body||'').length>320?'…':'')+'</p></article>').join(''):'<div class="tw-empty"><strong>Nessun report ancora</strong><p>Dopo alcune live potremo fare un punto della situazione e importarlo come report di periodo.</p></div>';
+    root.querySelectorAll('[data-report-id]').forEach(card=>card.onclick=()=>openReport(card.dataset.reportId));
+    const last=document.getElementById('tw-last-report');
+    if(!list.length)last.innerHTML='<div class="tw-empty" style="padding:22px 8px"><p>Quando faremo il primo punto della situazione comparirà qui.</p></div>';
+    else{const r=list[0];last.innerHTML='<div class="tw-report-period" style="margin-top:12px">'+esc(formatPeriod(r))+'</div><h3 style="margin:6px 0;color:var(--espresso);font:500 16px Lora,serif">'+esc(r.title)+'</h3><p style="margin:0;color:var(--ink-soft);font-size:11px;line-height:1.6">'+esc((r.summary||r.body||'').slice(0,220))+(String(r.summary||r.body||'').length>220?'…':'')+'</p><button class="tw-text-btn" type="button" data-open-last-report="'+esc(r.id)+'" style="margin-top:9px;padding:0">Apri report</button>';last.querySelector('[data-open-last-report]').onclick=()=>openReport(r.id)}
+  }
+
+  function renderAll(){renderSummary();renderCompare();renderRecent();renderArchive();renderReports()}
+
+  function listSection(title,items){return items?.length?'<div class="tw-detail-section"><h4>'+esc(title)+'</h4><ul>'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':''}
+  function openLive(id){
+    const l=store.lives.find(x=>x.id===id);if(!l)return;detailRef={kind:'live',id};
+    document.getElementById('tw-detail-content').innerHTML='<h2>'+esc(l.title)+'</h2><div style="display:flex;gap:7px;flex-wrap:wrap"><span class="tw-badge '+(isCoworking(l)?'spontaneous':'scheduled')+'">'+(isCoworking(l)?'Co-working spontanea':'Live programmata')+'</span><span class="tw-badge">'+esc(l.format||'—')+'</span>'+(l.model?'<span class="tw-badge">Modello: '+esc(l.model)+'</span>':'')+'</div><div class="tw-detail-grid"><div class="tw-detail-stat"><span>Data</span><strong>'+fmtDate(l.date)+(l.start_time?' · '+esc(l.start_time):'')+'</strong></div><div class="tw-detail-stat"><span>Durata</span><strong>'+fmtMinutes(l.duration_minutes)+'</strong></div><div class="tw-detail-stat"><span>Spettatori medi</span><strong>'+fmtNumber(metric(l,'average_viewers'),1)+'</strong></div><div class="tw-detail-stat"><span>Picco</span><strong>'+fmtNumber(metric(l,'peak_viewers'),0)+'</strong></div><div class="tw-detail-stat"><span>Follower</span><strong>'+(metric(l,'followers_gained')===null?'—':('+'+fmtNumber(metric(l,'followers_gained'),0)))+'</strong></div><div class="tw-detail-stat"><span>Attività</span><strong>'+esc(l.activity||'—')+'</strong></div></div>'+(l.background?'<div class="tw-detail-section"><h4>Sottofondo</h4><p>'+esc(l.background)+'</p></div>':'')+(l.analysis?.summary?'<div class="tw-detail-section"><h4>Analisi</h4><p>'+esc(l.analysis.summary)+'</p></div>':'')+listSection('Cosa ha funzionato',l.analysis?.positives)+listSection('Da osservare',l.analysis?.issues)+listSection('Osservazioni',l.analysis?.observations)+listSection('Prossimi esperimenti',l.analysis?.next_steps);
+    detailModal.classList.remove('hidden');
+  }
+  function openReport(id){
+    const r=store.reports.find(x=>x.id===id);if(!r)return;detailRef={kind:'report',id};
+    document.getElementById('tw-detail-content').innerHTML='<h2>'+esc(r.title)+'</h2><div class="tw-report-period">'+esc(formatPeriod(r))+'</div>'+(r.summary?'<div class="tw-detail-section"><h4>Situazione generale</h4><p>'+esc(r.summary)+'</p></div>':'')+listSection('Miglioramenti osservati',r.improvements)+listSection('Osservazioni',r.observations)+listSection('Esperimenti e cambiamenti',r.experiments)+listSection('Prossimi passi',r.next_steps)+(r.body?'<div class="tw-detail-section"><h4>Report completo</h4><p>'+esc(r.body)+'</p></div>':'');
+    detailModal.classList.remove('hidden');
+  }
+
+  function previewImport(item){
+    pendingImport=item;
+    const wrap=document.getElementById('tw-import-preview'),btn=document.getElementById('tw-import-confirm'),title=document.getElementById('tw-import-title'),copy=document.getElementById('tw-import-copy');
+    let duplicate=false;
+    if(item.kind==='live'){
+      const l=item.data;duplicate=store.lives.some(x=>x.id===l.id);title.textContent='Importa recap live';copy.textContent='Controlla i dati letti dal file prima di salvarli nel tracker.';
+      wrap.innerHTML=(duplicate?'<div class="tw-import-warning">Esiste già una live con lo stesso ID. Confermando, verrà sostituita.</div>':'')+'<div class="tw-import-preview"><div class="tw-import-line"><span>Live</span><strong>'+esc(l.title)+'</strong></div><div class="tw-import-line"><span>Data</span><strong>'+fmtDate(l.date)+(l.start_time?' · '+esc(l.start_time):'')+'</strong></div><div class="tw-import-line"><span>Tipo</span><strong>'+streamTypeLabel(l.stream_type)+'</strong></div><div class="tw-import-line"><span>Format</span><strong>'+esc(l.format)+'</strong></div><div class="tw-import-line"><span>Durata</span><strong>'+fmtMinutes(l.duration_minutes)+'</strong></div><div class="tw-import-line"><span>Spettatori medi</span><strong>'+fmtNumber(metric(l,'average_viewers'),1)+'</strong></div><div class="tw-import-line"><span>Picco</span><strong>'+fmtNumber(metric(l,'peak_viewers'),0)+'</strong></div><div class="tw-import-line"><span>Follower</span><strong>'+(metric(l,'followers_gained')===null?'—':('+'+fmtNumber(metric(l,'followers_gained'),0)))+'</strong></div></div>';
+    }else{
+      const r=item.data;duplicate=store.reports.some(x=>x.id===r.id);title.textContent='Importa report';copy.textContent='Il report verrà archiviato nella sezione Progressi.';
+      wrap.innerHTML=(duplicate?'<div class="tw-import-warning">Esiste già un report con lo stesso ID. Confermando, verrà sostituito.</div>':'')+'<div class="tw-import-preview"><div class="tw-import-line"><span>Titolo</span><strong>'+esc(r.title)+'</strong></div><div class="tw-import-line"><span>Periodo</span><strong>'+esc(formatPeriod(r))+'</strong></div><div class="tw-import-line" style="grid-column:1/-1"><span>Riassunto</span><strong>'+esc((r.summary||r.body||'—').slice(0,450))+'</strong></div></div>';
+    }
+    btn.textContent=duplicate?'Sostituisci':'Importa';importModal.classList.remove('hidden');
+  }
+  function closeImport(){importModal.classList.add('hidden');pendingImport=null;document.getElementById('tw-import-file').value=''}
+  async function confirmImport(){
+    if(!pendingImport)return;
+    const {kind,data}=pendingImport,list=kind==='live'?store.lives:store.reports,idx=list.findIndex(x=>x.id===data.id);
+    if(idx>=0)list[idx]=data;else list.push(data);
+    saveStore();closeImport();renderAll();requestAnimationFrame(renderChart);
+    const synced=await syncStore();
+    if(synced&&synced.ok)toast(kind==='live'?'Recap Twitch importato e sincronizzato.':'Report Twitch importato e sincronizzato.');
+    else if(!SCRIPT_URL)toast(kind==='live'?'Recap Twitch importato sul dispositivo.':'Report Twitch importato sul dispositivo.');
+  }
+
+  document.getElementById('tw-import-btn').onclick=()=>document.getElementById('tw-import-file').click();
+  document.getElementById('tw-import-report-btn').onclick=()=>document.getElementById('tw-import-file').click();
+  document.getElementById('tw-import-file').onchange=async e=>{
+    const file=e.target.files?.[0];if(!file)return;
+    try{const raw=JSON.parse(await file.text());previewImport(detectAndNormalize(raw))}catch(err){document.getElementById('tw-import-title').textContent='File non valido';document.getElementById('tw-import-copy').textContent='Non è stato possibile leggere questo recap.';document.getElementById('tw-import-preview').innerHTML='<div class="tw-import-error">'+esc(err?.message||'JSON non valido.')+'</div>';document.getElementById('tw-import-confirm').style.display='none';importModal.classList.remove('hidden');pendingImport=null}
+  };
+  document.getElementById('tw-import-cancel').onclick=closeImport;importModal.onclick=e=>{if(e.target===importModal)closeImport()};
+  document.getElementById('tw-import-confirm').onclick=async()=>{document.getElementById('tw-import-confirm').style.display='';await confirmImport()};
+  importModal.addEventListener('transitionend',()=>{});
+
+  document.getElementById('tw-backup-btn').onclick=()=>{
+    const blob=new Blob([JSON.stringify({schema_version:1,exported_at:new Date().toISOString(),...store},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='twitch-tracker-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+
+  page.querySelectorAll('[data-tw-tab]').forEach(btn=>btn.onclick=()=>{
+    page.querySelectorAll('[data-tw-tab]').forEach(x=>x.classList.toggle('active',x===btn));
+    page.querySelectorAll('[data-tw-panel]').forEach(x=>x.classList.toggle('active',x.dataset.twPanel===btn.dataset.twTab));
+    if(btn.dataset.twTab==='overview')requestAnimationFrame(renderChart);if(btn.dataset.twTab==='lives')renderArchive();if(btn.dataset.twTab==='reports')renderReports();
+  });
+  page.querySelectorAll('[data-period]').forEach(btn=>btn.onclick=()=>{currentPeriod=btn.dataset.period;page.querySelectorAll('[data-period]').forEach(x=>x.classList.toggle('active',x===btn));renderSummary();renderCompare();renderRecent();requestAnimationFrame(renderChart)});
+  page.querySelectorAll('[data-stream-filter]').forEach(btn=>btn.onclick=()=>{currentType=btn.dataset.streamFilter;page.querySelectorAll('[data-stream-filter]').forEach(x=>x.classList.toggle('active',x===btn));renderSummary();renderRecent();requestAnimationFrame(renderChart)});
+  page.querySelectorAll('[data-metric]').forEach(btn=>btn.onclick=()=>{currentMetric=btn.dataset.metric;page.querySelectorAll('[data-metric]').forEach(x=>x.classList.toggle('active',x===btn));requestAnimationFrame(renderChart)});
+  document.getElementById('tw-show-all-lives').onclick=()=>page.querySelector('[data-tw-tab="lives"]').click();
+  document.getElementById('tw-live-search').oninput=renderArchive;document.getElementById('tw-live-type').onchange=renderArchive;document.getElementById('tw-live-format').onchange=renderArchive;
+  document.getElementById('tw-detail-close').onclick=()=>{detailModal.classList.add('hidden');detailRef=null};detailModal.onclick=e=>{if(e.target===detailModal){detailModal.classList.add('hidden');detailRef=null}};
+  document.getElementById('tw-detail-delete').onclick=async()=>{
+    if(!detailRef)return;const list=detailRef.kind==='live'?store.lives:store.reports,item=list.find(x=>x.id===detailRef.id);if(!item)return;
+    const label=detailRef.kind==='live'?('la live “'+item.title+'”'):('il report “'+item.title+'”');if(!confirm('Eliminare '+label+' dal tracker?'))return;
+    const idx=list.findIndex(x=>x.id===detailRef.id);if(idx>=0)list.splice(idx,1);saveStore();detailModal.classList.add('hidden');detailRef=null;renderAll();requestAnimationFrame(renderChart);
+    const synced=await syncStore();
+    if(synced&&synced.ok)toast('Elemento eliminato e sincronizzato.');
+    else if(!SCRIPT_URL)toast('Elemento eliminato sul dispositivo.');
+  };
+
+  // Riporta sempre visibile il pulsante di conferma quando si apre un nuovo file.
+  document.getElementById('tw-import-file').addEventListener('click',()=>{document.getElementById('tw-import-confirm').style.display=''});
+
+  // Riceve lo storico Twitch da Google Sheets e aggiorna anche la cache locale.
+  window.replaceTwitchData=function(lives,reports){
+    store={version:1,lives:Array.isArray(lives)?lives:[],reports:Array.isArray(reports)?reports:[]};
+    saveStore();renderAll();requestAnimationFrame(renderChart);
+  };
+  if(window.__twitchRemoteData){
+    window.replaceTwitchData(window.__twitchRemoteData.lives,window.__twitchRemoteData.reports);
+  }
+  window.twitchTracker={getData:()=>JSON.parse(JSON.stringify(store)),render:renderAll,sync:syncStore};
+  renderAll();
+})();
+</script>
+
 </body>
 </html>
