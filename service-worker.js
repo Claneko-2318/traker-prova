@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v9-3-daily-month-average";
+const CACHE_NAME = "tracker-lavoro-cafe-v9-4-twitch-metrics";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",
@@ -38,7 +38,7 @@ self.addEventListener("fetch", (event) => {
   // I dati di Google Sheets devono arrivare sempre dalla rete.
   // Non memorizzare mai le risposte di Apps Script nella cache della PWA.
   if (url.hostname === "script.google.com" || url.hostname === "script.googleusercontent.com") {
-    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    event.respondWith(fetch(new Request(event.request, { cache: "no-store" })));
     return;
   }
 
@@ -47,7 +47,7 @@ self.addEventListener("fetch", (event) => {
     // vecchia versione GitHub Pages per un intero avvio della PWA.
     if (event.request.mode === "navigate" || url.pathname.endsWith("/working-tracker.html")) {
       event.respondWith(
-        fetch(event.request, { cache: "no-store" })
+        fetch(new Request(event.request, { cache: "no-store" }))
           .then((response) => {
             if (response && response.status === 200) {
               const copy = response.clone();
