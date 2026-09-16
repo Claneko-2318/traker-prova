@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- BUILD: tracker-cafe-task-archive-backup-2026-09-16 -->
+<!-- BUILD: tracker-cafe-commission-pricing-2026-09-16 -->
 
 
 <html lang="it">
 <head>
-<meta name="tracker-build" content="task-archive-backup-2026-09-16"/>
+<meta name="tracker-build" content="commission-pricing-2026-09-16"/>
 
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
@@ -531,6 +531,53 @@ tbody tr:last-child td{border-bottom:0}
 .empty-cell{padding:34px!important;text-align:center;color:var(--muted)!important;font-style:italic}
 .tbl-filter-btn.active{border-color:var(--coffee);color:#fff;background:var(--coffee)}
 
+
+/* ---------- Commissioni e tariffe ---------- */
+.pricing-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:1.25rem}
+.pricing-head h1{margin:0;color:var(--espresso);font-family:'Lora',serif;font-size:25px;font-weight:500}
+.pricing-head p{max-width:720px;margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+.pricing-grid{display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:18px;margin-bottom:1.5rem}
+.pricing-card{padding:18px;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--paper);box-shadow:var(--shadow-soft)}
+.pricing-card h2{margin:0 0 5px;color:var(--espresso);font:500 17px/1.3 'Lora',serif}
+.pricing-card-copy{margin:0 0 14px;color:var(--muted);font-size:11px;line-height:1.55}
+.pricing-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.pricing-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.pricing-field.full{grid-column:1/-1}
+.pricing-field label{color:var(--ink-soft);font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase}
+.pricing-field input,.pricing-field select{width:100%;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);outline:none}
+.pricing-field input:focus,.pricing-field select:focus{border-color:var(--line-strong);box-shadow:0 0 0 3px rgba(198,147,104,.12)}
+.pricing-target-result{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.pricing-target-result span{color:var(--muted);font-size:11px}
+.pricing-target-result strong{color:var(--espresso);font:500 25px 'Lora',serif}
+.pricing-quote-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:14px}
+.pricing-quote-summary div{padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--paper-warm)}
+.pricing-quote-summary span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.07em}
+.pricing-quote-summary strong{display:block;margin-top:3px;color:var(--espresso);font:500 17px 'Lora',serif}
+.pricing-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:1.25rem}
+.pricing-stat{padding:15px;border:1px solid var(--line);border-radius:15px;background:var(--paper)}
+.pricing-stat span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.07em}
+.pricing-stat strong{display:block;margin-top:4px;color:var(--espresso);font:500 20px 'Lora',serif}
+.pricing-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:16px;background:var(--paper)}
+.pricing-table{width:100%;min-width:980px;border-collapse:collapse;font-size:11px}
+.pricing-table th{padding:10px 9px;border-bottom:1px solid var(--line);background:var(--paper-warm);color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.06em;text-align:left;text-transform:uppercase;white-space:nowrap}
+.pricing-table td{padding:9px;border-bottom:1px solid rgba(226,207,186,.72);vertical-align:middle}
+.pricing-table tr:last-child td{border-bottom:0}
+.pricing-table input{width:88px;padding:6px 7px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.pricing-table input.pricing-type-input{width:132px}
+.pricing-table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pricing-project-name{font-weight:600;color:var(--ink)}
+.pricing-project-state{display:block;margin-top:2px;color:var(--muted);font-size:9px}
+.pricing-rate{font:500 13px 'Lora',serif;color:var(--coffee)}
+.pricing-delta{display:inline-flex;padding:3px 7px;border:1px solid var(--line);border-radius:999px;background:var(--paper-warm);color:var(--ink-soft);font-size:9px;white-space:nowrap}
+.pricing-note{margin:10px 0 0;color:var(--muted);font-size:10px;line-height:1.55}
+.pricing-type-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px}
+.pricing-type-card{padding:13px;border:1px solid var(--line);border-radius:13px;background:var(--paper)}
+.pricing-type-card h3{margin:0 0 7px;color:var(--ink);font-size:12px}
+.pricing-type-card strong{display:block;color:var(--coffee);font:500 18px 'Lora',serif}
+.pricing-type-card span{display:block;margin-top:3px;color:var(--muted);font-size:9px}
+@media(max-width:900px){.pricing-grid{grid-template-columns:1fr}.pricing-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.pricing-fields,.pricing-quote-summary,.pricing-summary-grid{grid-template-columns:1fr}.pricing-head{flex-direction:column}.pricing-target-result{align-items:flex-start;flex-direction:column}}
+
 /* ---------- Progetti ---------- */
 .proj-row{
   display:flex;
@@ -722,6 +769,11 @@ tbody tr:last-child td{border-bottom:0}
 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
 </svg>
 <span class="nav-label">Progetti</span></div>
+<div class="nav-icon" data-page="pricing" onclick="showPage('pricing')" title="Commissioni e tariffe">
+<svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24" width="20">
+<circle cx="12" cy="12" r="9"></circle><path d="M16 8.5c-.8-.8-2-1.2-3.4-1.2-2 0-3.6 1-3.6 2.5 0 1.6 1.5 2.2 3.4 2.6 1.8.4 3.1.9 3.1 2.4 0 1.4-1.4 2.5-3.6 2.5-1.5 0-2.9-.5-3.9-1.4"></path><path d="M12 5.5v13"></path>
+</svg>
+<span class="nav-label">Commissioni e tariffe</span></div>
 <div class="nav-icon-spacer"></div>
 <div class="nav-icon nav-desktop-only" onclick="window.open('https://docs.google.com/spreadsheets/d/1Qz5GMgGcltBylY2-u3qjE0-LmXr4fn0ZOWPiSvJcYeE/edit','_blank')" title="Apri Google Sheet">
 <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24" width="20">
@@ -737,7 +789,7 @@ tbody tr:last-child td{border-bottom:0}
 <span class="nav-label">Impostazioni</span></div>
 <div class="nav-footer">Un giorno alla volta, un compito alla volta.</div></nav>
 <!-- header -->
-<header class="topbar"><div class="topbar-title">Tracker produttività</div><div class="topbar-right"><div class="hero-date"><div class="hero-date-icon">📅</div><div id="hero-date-text">Oggi</div><div id="hero-day-text">—</div><div id="hero-time-text">--:--:--</div></div><span class="topbar-version">v9.4</span><div class="status-dot"><div class="status-dot-circle" id="status-dot"></div><span id="status-text">—</span></div></div></header>
+<header class="topbar"><div class="topbar-title">Tracker produttività</div><div class="topbar-right"><div class="hero-date"><div class="hero-date-icon">📅</div><div id="hero-date-text">Oggi</div><div id="hero-day-text">—</div><div id="hero-time-text">--:--:--</div></div><span class="topbar-version">v9.7</span><div class="status-dot"><div class="status-dot-circle" id="status-dot"></div><span id="status-text">—</span></div></div></header>
 <!-- config panel -->
 <div class="config-panel hidden" id="config-panel">
 <p>Incolla qui l'URL della tua Web App.</p>
@@ -753,7 +805,7 @@ tbody tr:last-child td{border-bottom:0}
 <button class="btn btn-sm" type="button" onclick="document.getElementById('backup-file').click()">↥ ripristina backup</button>
 </div>
 <input id="backup-file" type="file" accept="application/json,.json" hidden onchange="restoreBackupFile(this)"/>
-<div class="backup-status" id="backup-status">Salva sessioni, categorie, progetti, impostazioni e timer.</div>
+<div class="backup-status" id="backup-status">Salva sessioni, categorie, progetti, tariffe, Twitch, task, note, impostazioni e timer.</div>
 </div>
 </div>
 <div class="main">
@@ -966,6 +1018,53 @@ tbody tr:last-child td{border-bottom:0}
 <div id="proj-page-archived"></div>
 </div>
 </div>
+</div>
+<!-- PAGINA 4: Commissioni e tariffe -->
+<div class="page-section" id="page-pricing">
+  <div class="pricing-head">
+    <div><h1>Commissioni e tariffe</h1><p>Usa il tempo registrato come base per capire quanto rendono davvero le commissioni. Il calcolo considera tutte le sessioni collegate al progetto: disegno, messaggi, revisioni e consegna inclusi.</p></div>
+  </div>
+  <div class="pricing-grid">
+    <section class="pricing-card">
+      <h2>Tariffa oraria obiettivo</h2>
+      <p class="pricing-card-copy">Una cifra di riferimento per simulare i preventivi e confrontare il guadagno orario effettivo.</p>
+      <div class="pricing-fields">
+        <div class="pricing-field"><label>Tariffa obiettivo</label><input id="pricing-target-rate" type="number" min="0" step="0.50" placeholder="es. 15"></div>
+        <div class="pricing-field"><label>Commissione piattaforma predefinita</label><input id="pricing-default-platform-pct" type="number" min="0" max="100" step="0.1" placeholder="0"><span style="color:var(--muted);font-size:9px">%</span></div>
+      </div>
+      <div class="pricing-target-result"><span>Riferimento attuale</span><strong id="pricing-target-display">— €/h</strong></div>
+    </section>
+    <section class="pricing-card">
+      <h2>Preventivo</h2>
+      <p class="pricing-card-copy">Ore previste × tariffa, più eventuali extra. Gli extra sono importi fissi e restano separati dalla tariffa base.</p>
+      <div class="pricing-fields">
+        <div class="pricing-field"><label>Ore previste</label><input id="quote-hours" type="number" min="0" step="0.25" placeholder="0"></div>
+        <div class="pricing-field"><label>Tariffa €/h</label><input id="quote-rate" type="number" min="0" step="0.50" placeholder="0"></div>
+        <div class="pricing-field"><label>Extra revisioni €</label><input id="quote-revisions" type="number" min="0" step="0.50" value="0"></div>
+        <div class="pricing-field"><label>Extra urgenza €</label><input id="quote-urgency" type="number" min="0" step="0.50" value="0"></div>
+        <div class="pricing-field full"><label>Diritti d’uso €</label><input id="quote-usage" type="number" min="0" step="0.50" value="0"></div>
+      </div>
+      <div class="pricing-quote-summary">
+        <div><span>Base</span><strong id="quote-base">0,00 €</strong></div>
+        <div><span>Extra</span><strong id="quote-extras">0,00 €</strong></div>
+        <div><span>Preventivo</span><strong id="quote-total">0,00 €</strong></div>
+      </div>
+    </section>
+  </div>
+  <div class="section-label">guadagno orario effettivo</div>
+  <div class="pricing-summary-grid">
+    <div class="pricing-stat"><span>Commissioni con prezzo e tempo</span><strong id="pricing-stat-count">0</strong></div>
+    <div class="pricing-stat"><span>Ore registrate</span><strong id="pricing-stat-hours">—</strong></div>
+    <div class="pricing-stat"><span>Netto dopo piattaforma</span><strong id="pricing-stat-net">—</strong></div>
+    <div class="pricing-stat"><span>Media effettiva</span><strong id="pricing-stat-rate">—</strong></div>
+  </div>
+  <div class="pricing-table-wrap"><table class="pricing-table">
+    <thead><tr><th>Commissione</th><th>Tipologia</th><th>Tempo</th><th>Prezzo €</th><th>Fee %</th><th>Fee fissa €</th><th>Netto</th><th>€/h effettivi</th><th>Vs obiettivo</th></tr></thead>
+    <tbody id="pricing-project-body"></tbody>
+  </table></div>
+  <p class="pricing-note">Il guadagno orario effettivo è: (prezzo − commissione percentuale della piattaforma − commissione fissa) ÷ ore registrate. Costi, contributi e imposte non sono inclusi.</p>
+  <div class="section-label" style="margin-top:1.7rem">confronto per tipologia</div>
+  <div id="pricing-type-summary" class="pricing-type-grid"></div>
 </div>
 </div>
 </div><!-- /main-box -->
@@ -1199,6 +1298,7 @@ let selectedCatColor='#EAD9C0';
 let SCRIPT_URL=localStorage.getItem('focus_script_url')||'';
 let categories=[];
 let projects=[];
+let pricingSettings={targetRate:'',defaultPlatformPct:''};
 const now=new Date();
 let viewYear=now.getFullYear(),viewMonth=now.getMonth();
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
@@ -1220,6 +1320,7 @@ function showPage(name){
   document.querySelector('.nav-icon[data-page="'+name+'"]')?.classList.add('active');
   if(name==='data'){const f=getFiltered(viewYear,viewMonth);renderTable(f);renderChart(f);}
   if(name==='projects'){renderProjectsPage();}
+  if(name==='pricing'){renderCommissionPricingPage();}
 }
 function toggleConfig(){document.getElementById('config-panel').classList.toggle('hidden');}
 
@@ -1240,21 +1341,23 @@ function selectCatColor(el){
   document.querySelectorAll('.cat-color-dot').forEach(d=>d.classList.remove('selected'));
   el.classList.add('selected');
 }
-// --- progetti: oggetti {name, fee, archived} ---
+// --- progetti: oggetti {name, fee, archived, type, platformFeePct, platformFeeFixed} ---
 function normProject(p){
-  if(typeof p==='object'&&p!==null)return{name:p.name||'',fee:p.fee===0||p.fee?Number(p.fee):'',archived:!!p.archived};
+  if(typeof p==='object'&&p!==null)return{name:p.name||'',fee:p.fee===0||p.fee?Number(p.fee):'',archived:!!p.archived,type:p.type||'',platformFeePct:p.platformFeePct===0||p.platformFeePct?Number(p.platformFeePct):'',platformFeeFixed:p.platformFeeFixed===0||p.platformFeeFixed?Number(p.platformFeeFixed):''};
   const s=String(p);
   if(s.includes('|')){
     const parts=s.split('|');
-    return{name:parts[0],fee:parts[1]!==''&&parts[1]!==undefined?Number(parts[1]):'',archived:parts[2]==='1'};
+    let type='';try{type=decodeURIComponent(parts[3]||'');}catch(err){type=parts[3]||'';}
+    return{name:parts[0],fee:parts[1]!==''&&parts[1]!==undefined?Number(parts[1]):'',archived:parts[2]==='1',type,platformFeePct:parts[4]!==''&&parts[4]!==undefined?Number(parts[4]):'',platformFeeFixed:parts[5]!==''&&parts[5]!==undefined?Number(parts[5]):''};
   }
-  return{name:s,fee:'',archived:false};
+  return{name:s,fee:'',archived:false,type:'',platformFeePct:'',platformFeeFixed:''};
 }
 function normProjects(arr){return(arr||[]).map(normProject).filter(p=>p.name);}
-function encodeProj(p){return p.name+'|'+(p.fee===''||p.fee==null?'':p.fee)+'|'+(p.archived?'1':'');}
+function encodeProj(p){return p.name+'|'+(p.fee===''||p.fee==null?'':p.fee)+'|'+(p.archived?'1':'')+'|'+encodeURIComponent(p.type||'')+'|'+(p.platformFeePct===''||p.platformFeePct==null?'':p.platformFeePct)+'|'+(p.platformFeeFixed===''||p.platformFeeFixed==null?'':p.platformFeeFixed);}
 function saveProjects(){
   localStorage.setItem('focus_projects',JSON.stringify(projects));
   if(SCRIPT_URL) api({action:'saveProjects',projects:projects.map(encodeProj)}).catch(()=>{});
+  if(document.getElementById('page-pricing'))renderCommissionPricingPage();
 }
 function renderProjects(){
   const chips=document.getElementById('proj-chips');
@@ -1283,7 +1386,7 @@ function addProject(){
   if(!val)return;
   if(val.includes('|')){toast('Il carattere | non è consentito nel nome.');return;}
   if(projects.some(p=>p.name===val)){toast('Già presente.');return;}
-  projects.push({name:val,fee:'',archived:false});
+  projects.push({name:val,fee:'',archived:false,type:'',platformFeePct:'',platformFeeFixed:''});
   saveProjects();renderProjects();renderProjectsPage();
   document.getElementById('inp-new-proj').value='';
 }
@@ -1405,6 +1508,21 @@ function toggleProjDetail(i){
   c.classList.toggle('open');
   if(d.classList.contains('open'))openProjRows.add(i);else openProjRows.delete(i);
 }
+function moneyIt(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €':'—';}
+function numOrBlank(v){if(v===''||v==null)return'';const n=Number(v);return Number.isFinite(n)?n:'';}
+function loadPricingSettings(){try{const raw=JSON.parse(localStorage.getItem('focus_pricing_settings_v1')||'{}');pricingSettings={targetRate:numOrBlank(raw.targetRate),defaultPlatformPct:numOrBlank(raw.defaultPlatformPct)};}catch(err){pricingSettings={targetRate:'',defaultPlatformPct:''};}}
+function savePricingSettings(){localStorage.setItem('focus_pricing_settings_v1',JSON.stringify(pricingSettings));renderCommissionPricingPage();}
+function projectMinutes(name){return getLinkedSessions(name).reduce((sum,s)=>sum+Number(s.minutes||0),0);}
+function effectiveProjectData(p){const mins=projectMinutes(p.name),hours=mins/60,fee=(p.fee===''||p.fee==null)?null:Number(p.fee);const pct=(p.platformFeePct===''||p.platformFeePct==null)?Number(pricingSettings.defaultPlatformPct||0):Number(p.platformFeePct||0);const fixed=Number(p.platformFeeFixed||0);const platformCost=fee==null?null:(fee*(pct/100)+fixed);const net=fee==null?null:fee-platformCost;const rate=net!=null&&hours>0?net/hours:null;return{mins,hours,fee,pct,fixed,platformCost,net,rate};}
+function quoteValue(id){const n=Number(document.getElementById(id)?.value||0);return Number.isFinite(n)?Math.max(0,n):0;}
+function updateQuoteCalculator(){const hours=quoteValue('quote-hours'),rate=quoteValue('quote-rate'),revisions=quoteValue('quote-revisions'),urgency=quoteValue('quote-urgency'),usage=quoteValue('quote-usage'),base=hours*rate,extras=revisions+urgency+usage,total=base+extras;const b=document.getElementById('quote-base'),e=document.getElementById('quote-extras'),t=document.getElementById('quote-total');if(b)b.textContent=moneyIt(base);if(e)e.textContent=moneyIt(extras);if(t)t.textContent=moneyIt(total);}
+function savePricingProjectField(i,field,value){const p=projects[i];if(!p)return;if(field==='type'){p.type=String(value||'').trim();}else{if(value===''){p[field]='';}else{const n=Number(value);if(!Number.isFinite(n)||n<0){toast('Valore non valido.');renderCommissionPricingPage();return;}if(field==='platformFeePct'&&n>100){toast('La commissione percentuale non può superare il 100%.');renderCommissionPricingPage();return;}p[field]=n;}}saveProjects();}
+function renderPricingTable(){const body=document.getElementById('pricing-project-body');if(!body)return;if(!projects.length){body.innerHTML='<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--muted);font-style:italic">Nessun progetto ancora. Crealo dalla pagina Sessioni e poi collegagli le sessioni di lavoro.</td></tr>';return;}const target=Number(pricingSettings.targetRate||0);body.innerHTML=projects.map((p,i)=>{const d=effectiveProjectData(p),delta=d.rate!=null&&target>0?d.rate-target:null;const deltaLabel=delta==null?'—':(delta===0?'in linea':(delta>0?'+':'')+delta.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h');return'<tr><td><span class="pricing-project-name">'+esc(p.name)+'</span><span class="pricing-project-state">'+(p.archived?'archiviata':'attiva')+'</span></td><td><input class="pricing-type-input" type="text" placeholder="es. half body" value="'+esc(p.type||'')+'" onchange="savePricingProjectField('+i+',\'type\',this.value)"></td><td class="num">'+(d.mins?toHours(d.mins):'—')+'</td><td><input type="number" min="0" step="0.50" placeholder="—" value="'+(p.fee===''||p.fee==null?'':p.fee)+'" onchange="savePricingProjectField('+i+',\'fee\',this.value)"></td><td><input type="number" min="0" max="100" step="0.1" placeholder="'+(pricingSettings.defaultPlatformPct===''?'0':pricingSettings.defaultPlatformPct)+'" value="'+(p.platformFeePct===''||p.platformFeePct==null?'':p.platformFeePct)+'" onchange="savePricingProjectField('+i+',\'platformFeePct\',this.value)"></td><td><input type="number" min="0" step="0.10" placeholder="0" value="'+(p.platformFeeFixed===''||p.platformFeeFixed==null?'':p.platformFeeFixed)+'" onchange="savePricingProjectField('+i+',\'platformFeeFixed\',this.value)"></td><td class="num">'+(d.net==null?'—':moneyIt(d.net))+'</td><td class="num pricing-rate">'+(d.rate==null?'—':d.rate.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h')+'</td><td><span class="pricing-delta">'+deltaLabel+'</span></td></tr>';}).join('');}
+function renderPricingSummary(){const usable=projects.map(p=>({p,d:effectiveProjectData(p)})).filter(x=>x.d.fee!=null&&x.d.hours>0),hours=usable.reduce((a,x)=>a+x.d.hours,0),net=usable.reduce((a,x)=>a+(x.d.net||0),0),rate=hours>0?net/hours:null;const count=document.getElementById('pricing-stat-count'),h=document.getElementById('pricing-stat-hours'),n=document.getElementById('pricing-stat-net'),r=document.getElementById('pricing-stat-rate');if(count)count.textContent=usable.length;if(h)h.textContent=hours?toHours(Math.round(hours*60)):'—';if(n)n.textContent=usable.length?moneyIt(net):'—';if(r)r.textContent=rate==null?'—':rate.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h';}
+function renderPricingTypes(){const root=document.getElementById('pricing-type-summary');if(!root)return;const groups={};projects.forEach(p=>{const type=(p.type||'').trim();if(!type)return;const d=effectiveProjectData(p);if(d.fee==null||d.hours<=0)return;const key=type.toLocaleLowerCase('it-IT');if(!groups[key])groups[key]={label:type,count:0,hours:0,net:0};groups[key].count++;groups[key].hours+=d.hours;groups[key].net+=d.net||0;});const arr=Object.values(groups).sort((a,b)=>a.label.localeCompare(b.label,'it'));root.innerHTML=arr.length?arr.map(g=>'<div class="pricing-type-card"><h3>'+esc(g.label)+'</h3><strong>'+(g.hours?g.net/g.hours:0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h</strong><span>'+g.count+' commission'+(g.count===1?'e':'i')+' · '+toHours(Math.round(g.hours*60))+'</span></div>').join(''):'<div class="pricing-type-card" style="grid-column:1/-1"><span>Assegna una tipologia alle commissioni con prezzo e tempo registrato per confrontarle qui.</span></div>';}
+function renderCommissionPricingPage(){const page=document.getElementById('page-pricing');if(!page)return;const target=document.getElementById('pricing-target-rate'),platform=document.getElementById('pricing-default-platform-pct'),display=document.getElementById('pricing-target-display'),quoteRate=document.getElementById('quote-rate');if(target&&document.activeElement!==target)target.value=pricingSettings.targetRate;if(platform&&document.activeElement!==platform)platform.value=pricingSettings.defaultPlatformPct;if(display)display.textContent=pricingSettings.targetRate!==''?Number(pricingSettings.targetRate).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h':'— €/h';if(quoteRate&&!quoteRate.dataset.userEdited&&document.activeElement!==quoteRate)quoteRate.value=pricingSettings.targetRate;renderPricingTable();renderPricingSummary();renderPricingTypes();updateQuoteCalculator();}
+function bindPricingPage(){const target=document.getElementById('pricing-target-rate'),platform=document.getElementById('pricing-default-platform-pct'),quoteRate=document.getElementById('quote-rate');if(target)target.addEventListener('change',()=>{pricingSettings.targetRate=target.value===''?'':Math.max(0,Number(target.value)||0);savePricingSettings();if(quoteRate&&!quoteRate.dataset.userEdited){quoteRate.value=pricingSettings.targetRate;updateQuoteCalculator();}});if(platform)platform.addEventListener('change',()=>{const n=platform.value===''?'':Math.min(100,Math.max(0,Number(platform.value)||0));pricingSettings.defaultPlatformPct=n;savePricingSettings();});['quote-hours','quote-rate','quote-revisions','quote-urgency','quote-usage'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>{if(id==='quote-rate')document.getElementById(id).dataset.userEdited='1';updateQuoteCalculator();}));}
+
 function saveCategories(){
   localStorage.setItem('focus_categories',JSON.stringify(categories));
   if(SCRIPT_URL) api({action:'saveCategories',categories:categories.map(c=>(c.name||c)+'|'+(c.color||'#EAD9C0'))}).catch(()=>{});
@@ -1979,6 +2097,7 @@ async function loadSessions(){
     }
     renderProjects();
     renderProjectsPage();
+    renderCommissionPricingPage();
     if(data.categories&&data.categories.length>0){
       const saved=JSON.parse(localStorage.getItem('focus_categories')||'[]');
       const colorMap={};saved.forEach(c=>{if(c.name)colorMap[c.name]=c.color;});
@@ -2075,21 +2194,21 @@ function buildBackup(){
   let taskData=[];try{taskData=window.workTaskApi?copy(window.workTaskApi.list()):JSON.parse(localStorage.getItem('focus_work_tasks_v1')||'[]');}catch(err){taskData=[]}
   let quickNotes=[];try{quickNotes=JSON.parse(localStorage.getItem('focus_quick_notes_v1')||'[]');}catch(err){quickNotes=[]}
   let twitch=null;try{twitch=window.twitchTracker?window.twitchTracker.getData():JSON.parse(localStorage.getItem('focus_twitch_tracker_v1_live')||'null');}catch(err){twitch=null}
-  return{format:'tracker-produttivita-backup',version:2,schema:{sessions:2,tasks:2,projects:2,twitch:1},exportedAt:new Date().toISOString(),sessions:copy(sessions),categories:copy(categories),projects:copy(projects),moods:copy(moods),tasks:copy(taskData),quickNotes:copy(quickNotes),twitch:copy(twitch),syncState:trackerSync.export(),settings:{scriptUrl:SCRIPT_URL||'',currentMode,tableLimit},timerState:copy(ts),timerPreferences:{longBreak:document.getElementById('timer-pausa-lunga')?.value||'',longBreakEvery:document.getElementById('timer-pausa-lunga-ogni')?.value||''}};
+  return{format:'tracker-produttivita-backup',version:3,schema:{sessions:2,tasks:2,projects:3,pricing:1,twitch:1},exportedAt:new Date().toISOString(),sessions:copy(sessions),categories:copy(categories),projects:copy(projects),pricingSettings:copy(pricingSettings),moods:copy(moods),tasks:copy(taskData),quickNotes:copy(quickNotes),twitch:copy(twitch),syncState:trackerSync.export(),settings:{scriptUrl:SCRIPT_URL||'',currentMode,tableLimit},timerState:copy(ts),timerPreferences:{longBreak:document.getElementById('timer-pausa-lunga')?.value||'',longBreakEvery:document.getElementById('timer-pausa-lunga-ogni')?.value||''}};
 }
 function downloadBackup(){const blob=new Blob([JSON.stringify(buildBackup(),null,2)],{type:'application/json;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tracker-produttivita-backup-'+todayStr+'.json';a.click();URL.revokeObjectURL(a.href);document.getElementById('backup-status').textContent='Backup scaricato il '+new Date().toLocaleString('it-IT')+'.';toast('Backup scaricato!');}
 async function restoreBackupFile(input){
   const file=input.files&&input.files[0];input.value='';if(!file)return;let backup;try{backup=JSON.parse(await file.text());}catch(err){toast('Il file di backup non è valido.');return;}
   if(!backup||backup.format!=='tracker-produttivita-backup'||!Array.isArray(backup.sessions)){toast('Questo file non è un backup del tracker.');return;}
-  if(!confirm('Ripristinare questo backup?\n\nTask, note, Twitch, categorie, progetti e impostazioni locali verranno aggiornati. Le sessioni già presenti non saranno duplicate.'))return;
+  if(!confirm('Ripristinare questo backup?\n\nTask, note, Twitch, categorie, progetti, tariffe e impostazioni locali verranno aggiornati. Le sessioni già presenti non saranno duplicate.'))return;
   if(window.importWorkDashboardBackup)await window.importWorkDashboardBackup(backup);
-  const status=document.getElementById('backup-status');status.textContent='Ripristino in corso…';categories=Array.isArray(backup.categories)?backup.categories:[];projects=normProjects(Array.isArray(backup.projects)?backup.projects:[]);moods=backup.moods&&typeof backup.moods==='object'?backup.moods:{};localStorage.setItem('focus_categories',JSON.stringify(categories));localStorage.setItem('focus_projects',JSON.stringify(projects));localStorage.setItem('focus_moods',JSON.stringify(moods));
+  const status=document.getElementById('backup-status');status.textContent='Ripristino in corso…';categories=Array.isArray(backup.categories)?backup.categories:[];projects=normProjects(Array.isArray(backup.projects)?backup.projects:[]);moods=backup.moods&&typeof backup.moods==='object'?backup.moods:{};localStorage.setItem('focus_categories',JSON.stringify(categories));localStorage.setItem('focus_projects',JSON.stringify(projects));localStorage.setItem('focus_moods',JSON.stringify(moods));if(backup.pricingSettings&&typeof backup.pricingSettings==='object'){pricingSettings={targetRate:numOrBlank(backup.pricingSettings.targetRate),defaultPlatformPct:numOrBlank(backup.pricingSettings.defaultPlatformPct)};localStorage.setItem('focus_pricing_settings_v1',JSON.stringify(pricingSettings));}
   if(backup.settings){if(backup.settings.scriptUrl){SCRIPT_URL=backup.settings.scriptUrl;localStorage.setItem('focus_script_url',SCRIPT_URL);document.getElementById('script-url').value=SCRIPT_URL;}if(['pom','time','flow'].includes(backup.settings.currentMode))setMode(backup.settings.currentMode);if([0,5,10].includes(Number(backup.settings.tableLimit)))tableLimit=Number(backup.settings.tableLimit);}
   if(backup.timerState)localStorage.setItem(TIMER_KEY,JSON.stringify(backup.timerState));
   const imported=backup.sessions.map(s=>({...s,date:normalizeDate(s.date)})),signatures=new Set(sessions.map(sessionSignature)),missing=imported.filter(s=>!signatures.has(sessionSignature(s)));let added=0,failed=0;
   if(SCRIPT_URL&&missing.length){setStatus('Ripristino sessioni…','wait');for(const s of missing){const payload={date:s.date,category:s.category||'',minutes:Number(s.minutes||0),pomodori:s.pomodori||'',durata_pomodoro:s.durata_pomodoro||'',note:s.note||'',mood:s.mood||'',projects:!s.projects?[]:(Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(x=>x.trim()).filter(Boolean)),task:s.task||'',taskId:s.taskId||''};const r=await api({action:'add',session:payload});if(r&&r.ok){sessions.push({...payload,id:r.id});added++;}else failed++;}}
   else if(!SCRIPT_URL){missing.forEach(s=>{sessions.push(s);added++;});}
-  sessions.sort((a,b)=>a.date.localeCompare(b.date));saveCategories();saveProjects();renderCategories();renderProjects();refresh();if(backup.timerState){try{restoreTimer();}catch(err){}}if(SCRIPT_URL)setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');const msg='Ripristino completato: '+added+' session'+(added===1?'e aggiunta':'i aggiunte')+(failed?' · '+failed+' non importate':'')+'.';status.textContent=msg;toast(msg);
+  sessions.sort((a,b)=>a.date.localeCompare(b.date));saveCategories();saveProjects();renderCategories();renderProjects();renderCommissionPricingPage();refresh();if(backup.timerState){try{restoreTimer();}catch(err){}}if(SCRIPT_URL)setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');const msg='Ripristino completato: '+added+' session'+(added===1?'e aggiunta':'i aggiunte')+(failed?' · '+failed+' non importate':'')+'.';status.textContent=msg;toast(msg);
 }
 
 async function addRow(){
@@ -2283,9 +2402,10 @@ document.getElementById('inp-date').value=todayStr;
 try{sessions=JSON.parse(localStorage.getItem('focus_sessions_cache')||'[]');if(!Array.isArray(sessions))sessions=[];}catch(err){sessions=[];}
 categories=JSON.parse(localStorage.getItem('focus_categories')||'[]');
 projects=normProjects(JSON.parse(localStorage.getItem('focus_projects')||'[]'));
+loadPricingSettings();
 const rawInit=JSON.parse(localStorage.getItem('focus_moods')||'{}');
 moods={};Object.keys(rawInit).forEach(k=>{const norm=normalizeDate(k);if(norm)moods[norm]=rawInit[k];});
-renderCategories();renderProjects();refresh();
+renderCategories();renderProjects();bindPricingPage();renderCommissionPricingPage();refresh();
 if(SCRIPT_URL){document.getElementById('script-url').value=SCRIPT_URL;loadSessions();}
 else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
@@ -2429,7 +2549,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
 <style>
 /* Gerarchia task, note sincronizzate e rifiniture tablet */
-html:before{content:'TRACKER_VERSION_9.6';display:none}
+html:before{content:'TRACKER_VERSION_9.7';display:none}
 #home-new-task-inline{display:none!important}
 .app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
 .task-parent-fields{grid-column:1/-1}
@@ -2648,7 +2768,7 @@ html:before{content:'TRACKER_VERSION_9.6';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.6.0';
+const TRACKER_VERSION='9.7.0';
 const REQUIRED_BACKEND_VERSION='8.6';
 const TRACKER_CACHE_MARK='v9-5-safe-sync';
 function versionAtLeast(current,required){
