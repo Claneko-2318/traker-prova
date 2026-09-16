@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v9-4-1-update-popup";
+const CACHE_NAME = "tracker-lavoro-cafe-v9-4-2-flow-update";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",
@@ -13,7 +13,7 @@ const APP_SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => cache.addAll(APP_SHELL.map(path => new Request(path, {cache: "reload"}))))
   );
 });
 

@@ -353,7 +353,7 @@ button{cursor:pointer}
 #timer-running{position:relative;z-index:1}
 
 /* Form */
-.form-fields,.mode-pom,.mode-time{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.form-fields,.mode-pom,.mode-time,.mode-flow{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .field label{
   color:var(--muted);
@@ -822,6 +822,7 @@ tbody tr:last-child td{border-bottom:0}
 <button class="mode-btn active" id="btn-mode-pom" onclick="setMode('pom')" type="button">🍅 pomodoro</button>
 <button class="mode-btn" id="btn-mode-time" onclick="setMode('time')" type="button">⏱ ore e minuti</button>
 </div>
+<button class="mode-btn" id="btn-mode-flow" onclick="setMode('flow')" type="button">🌊 flowmodoro</button>
 <div class="mode-pom" id="mode-pom-fields" style="display:flex;">
 <div class="field field-pom"><label>pomodori</label><input id="inp-pomodori" max="20" min="1" oninput="updatePreview()" placeholder="es. 4" type="number"/></div>
 <div class="field field-dur"><label>durata</label>
@@ -833,6 +834,10 @@ tbody tr:last-child td{border-bottom:0}
 </div>
 <div class="field field-custom" id="field-custom-durata" style="display:none;"><label>minuti</label><input id="inp-durata-custom" max="500" min="1" oninput="updatePreview()" placeholder="30" type="number"/></div>
 <div class="field-preview"><span class="preview-text" id="preview"></span></div>
+</div>
+<div class="mode-flow" id="mode-flow-fields" style="display:none;gap:8px;align-items:flex-end;">
+<div class="field"><label>minuti flowmodoro</label><input id="inp-flow-min" max="1440" min="1" oninput="updatePreview()" placeholder="es. 125" style="width:150px;" type="number"/></div>
+<div class="field-preview"><span class="preview-text" id="preview-flow"></span></div>
 </div>
 <div class="mode-time" id="mode-time-fields" style="display:none;gap:8px;align-items:flex-end;">
 <div class="field"><label>ore</label><input id="inp-ore" max="23" min="0" oninput="updatePreview()" placeholder="0" style="width:70px;" type="number"/></div>
@@ -1290,14 +1295,19 @@ function updatePreview(){
   const totTime=h*60+m;
   const ptEl=document.getElementById('preview-time');
   if(ptEl) ptEl.innerHTML=totTime>0?`<strong>${toHours(totTime)}</strong>`:'';
+  const flowMin=parseInt(document.getElementById('inp-flow-min').value)||0;
+  const pfEl=document.getElementById('preview-flow');
+  if(pfEl) pfEl.innerHTML=flowMin>0?`<strong>${flowMin} min</strong> → ${toHours(flowMin)}`:'';
 }
 let currentMode='pom';
 function setMode(mode){
-  currentMode=mode;
+  currentMode=['pom','time','flow'].includes(mode)?mode:'pom';
   document.getElementById('mode-pom-fields').style.display=mode==='pom'?'flex':'none';
   document.getElementById('mode-time-fields').style.display=mode==='time'?'flex':'none';
+  document.getElementById('mode-flow-fields').style.display=mode==='flow'?'flex':'none';
   document.getElementById('btn-mode-pom').classList.toggle('active',mode==='pom');
   document.getElementById('btn-mode-time').classList.toggle('active',mode==='time');
+  document.getElementById('btn-mode-flow').classList.toggle('active',mode==='flow');
   updatePreview();
 }
 
@@ -1914,7 +1924,7 @@ async function restoreBackupFile(input){
   if(window.importWorkDashboardBackup)window.importWorkDashboardBackup(backup);
   if(!confirm('Ripristinare questo backup?\n\nCategorie, progetti e impostazioni locali verranno aggiornati. Le sessioni già presenti non saranno duplicate.'))return;
   const status=document.getElementById('backup-status');status.textContent='Ripristino in corso…';categories=Array.isArray(backup.categories)?backup.categories:[];projects=normProjects(Array.isArray(backup.projects)?backup.projects:[]);moods=backup.moods&&typeof backup.moods==='object'?backup.moods:{};localStorage.setItem('focus_categories',JSON.stringify(categories));localStorage.setItem('focus_projects',JSON.stringify(projects));localStorage.setItem('focus_moods',JSON.stringify(moods));
-  if(backup.settings){if(backup.settings.scriptUrl){SCRIPT_URL=backup.settings.scriptUrl;localStorage.setItem('focus_script_url',SCRIPT_URL);document.getElementById('script-url').value=SCRIPT_URL;}if(['pom','time'].includes(backup.settings.currentMode))setMode(backup.settings.currentMode);if([0,5,10].includes(Number(backup.settings.tableLimit)))tableLimit=Number(backup.settings.tableLimit);}
+  if(backup.settings){if(backup.settings.scriptUrl){SCRIPT_URL=backup.settings.scriptUrl;localStorage.setItem('focus_script_url',SCRIPT_URL);document.getElementById('script-url').value=SCRIPT_URL;}if(['pom','time','flow'].includes(backup.settings.currentMode))setMode(backup.settings.currentMode);if([0,5,10].includes(Number(backup.settings.tableLimit)))tableLimit=Number(backup.settings.tableLimit);}
   if(backup.timerState)localStorage.setItem(TIMER_KEY,JSON.stringify(backup.timerState));
   const imported=backup.sessions.map(s=>({...s,date:normalizeDate(s.date)})),signatures=new Set(sessions.map(sessionSignature)),missing=imported.filter(s=>!signatures.has(sessionSignature(s)));let added=0,failed=0;
   if(SCRIPT_URL&&missing.length){setStatus('Ripristino sessioni…','wait');for(const s of missing){const payload={date:s.date,category:s.category||'',minutes:Number(s.minutes||0),pomodori:s.pomodori||'',durata_pomodoro:s.durata_pomodoro||'',note:s.note||'',mood:s.mood||'',projects:!s.projects?[]:(Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(x=>x.trim()).filter(Boolean)),task:s.task||''};const r=await api({action:'add',session:payload});if(r&&r.ok){sessions.push({...payload,id:r.id});added++;}else failed++;}}
@@ -1937,12 +1947,16 @@ async function addRow(){
     if(!pomodori||pomodori<1){toast('Inserisci il numero di pomodori.');return;}
     if(!durata_pomodoro){toast('Inserisci la durata.');return;}
     minutes=pomodori*durata_pomodoro;
-  } else {
+  } else if(currentMode==='time') {
     const h=parseInt(document.getElementById('inp-ore').value)||0;
     const m=parseInt(document.getElementById('inp-min').value)||0;
     minutes=h*60+m;
     pomodori='';durata_pomodoro='';
     if(!minutes||minutes<1){toast('Inserisci ore o minuti.');return;}
+  } else {
+    minutes=parseInt(document.getElementById('inp-flow-min').value)||0;
+    pomodori='';durata_pomodoro='';
+    if(minutes<1){toast('Inserisci i minuti del Flowmodoro.');return;}
   }
   const btn=document.getElementById('btn-add');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>salvataggio…';
   const data=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:sessionProjects}});
@@ -1955,8 +1969,11 @@ async function addRow(){
     document.getElementById('inp-durata-custom').value='';
     document.getElementById('inp-ore').value='';
     document.getElementById('inp-min').value='';
+    document.getElementById('inp-flow-min').value='';
     document.getElementById('inp-note').value='';
     document.getElementById('preview').innerHTML='';
+    document.getElementById('preview-time').innerHTML='';
+    document.getElementById('preview-flow').innerHTML='';
     document.querySelectorAll('.mood-btn[data-mood]').forEach(b=>b.classList.remove('selected'));
     renderProjSelector('inp-proj-chips');
     toast('Sessione salvata!');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
@@ -2265,7 +2282,7 @@ html:before{content:'TRACKER_VERSION_9.4';display:none}
 .task-order-controls{display:flex;gap:2px;align-items:center}.task-order-btn{display:grid;place-items:center;width:25px;height:28px;padding:0;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;line-height:1}.task-order-btn:hover:not(:disabled){border-color:var(--line);background:var(--paper-deep);color:var(--coffee)}.task-order-btn:disabled{opacity:.25;cursor:default}
 .task-root-drop{display:none;margin:7px 0;padding:9px;border:1px dashed var(--caramel);border-radius:12px;color:var(--coffee);background:var(--paper-warm);text-align:center;font-size:10px}.task-root-drop.drag-target{background:var(--paper-deep);outline:0}.task-list-dragging>.task-root-drop{display:block}
 .home-task-check{display:grid!important;place-items:center!important;padding:0!important;line-height:1!important;font-size:12px!important;text-align:center!important}
-#page-insert .mode-pom,#page-insert .mode-time{margin-top:12px}
+#page-insert .mode-pom,#page-insert .mode-time,#page-insert .mode-flow{margin-top:12px}
 #page-insert .field-pom,#page-insert .field-dur,#page-insert .field-custom{flex:0 1 187px}
 .home-note{position:relative;padding-right:31px}
 .home-note-delete{position:absolute;right:5px;top:5px;width:24px;height:24px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:16px}
@@ -2455,9 +2472,9 @@ html:before{content:'TRACKER_VERSION_9.4';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.4.1';
+const TRACKER_VERSION='9.4.2';
 const REQUIRED_BACKEND_VERSION='8.4';
-const TRACKER_CACHE_MARK='v9-4-twitch-metrics';
+const TRACKER_CACHE_MARK='v9-4-2-flow-update';
 function versionAtLeast(current,required){
   const a=String(current||'0').split('.').map(n=>parseInt(n,10)||0),b=String(required||'0').split('.').map(n=>parseInt(n,10)||0),len=Math.max(a.length,b.length);
   for(let i=0;i<len;i++){const av=a[i]||0,bv=b[i]||0;if(av>bv)return true;if(av<bv)return false}return true;
@@ -2505,6 +2522,15 @@ if('serviceWorker' in navigator){
       watch(reg.installing);
       reg.addEventListener('updatefound',()=>watch(reg.installing));
       const check=()=>reg.update().catch(()=>{});
+      const checkButton=document.createElement('button');
+      checkButton.type='button';checkButton.className='btn btn-sm';checkButton.textContent='Controlla aggiornamenti';
+      document.getElementById('app-version-badge')?.after(checkButton);
+      checkButton.onclick=async()=>{
+        checkButton.disabled=true;
+        try{await reg.update();if(reg.waiting)showTrackerUpdate();else toast(reg.installing?'Aggiornamento in download: attendi il pop-up.':'Nessun aggiornamento disponibile al momento. Versione '+TRACKER_VERSION+'.')}
+        catch(e){toast('Controllo non riuscito. Verifica la connessione.')}
+        finally{checkButton.disabled=false}
+      };
       check();setInterval(check,15*60*1000);
       document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check()});
     }).catch(error=>console.warn('Registrazione service worker non riuscita:',error));
