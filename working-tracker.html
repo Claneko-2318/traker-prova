@@ -1044,6 +1044,145 @@ tbody tr:last-child td{border-bottom:0}
 </div>
 <div id="toast"></div>
 <script>
+// Confronto a tre versioni: unisce modifiche su elementi diversi senza sovrascriverle.
+function syncCanonical(value){
+  if(value===undefined)return 'undefined';
+  if(value===null||typeof value!=='object')return JSON.stringify(value);
+  if(Array.isArray(value))return '['+value.map(syncCanonical).join(',')+']';
+  return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+syncCanonical(value[k])).join(',')+'}';
+}
+function syncRecordId(value){return String(value.id||value.at||'')}
+function syncMerge(base,local,remote){
+  const result={},conflicts=[];
+  for(const key of Object.keys(remote)){
+    const b=new Map((base?.[key]||[]).map(v=>[syncRecordId(v),v]));
+    const l=new Map((local[key]||[]).map(v=>[syncRecordId(v),v]));
+    const r=new Map((remote[key]||[]).map(v=>[syncRecordId(v),v]));
+    const list=[];
+    for(const id of new Set([...l.keys(),...r.keys(),...b.keys()])){
+      const bv=b.get(id),lv=l.get(id),rv=r.get(id);let chosen;
+      if(syncCanonical(lv)===syncCanonical(rv))chosen=lv;
+      else if(base!==null&&syncCanonical(lv)===syncCanonical(bv))chosen=rv;
+      else if(base!==null&&syncCanonical(rv)===syncCanonical(bv))chosen=lv;
+      else if(!b.has(id)&&!l.has(id))chosen=rv;
+      else if(!b.has(id)&&!r.has(id))chosen=lv;
+      else {conflicts.push({collection:key,id,local:lv,remote:rv});chosen=rv;}
+      if(chosen!==undefined)list.push(chosen);
+    }
+    result[key]=list;
+  }
+  return {data:result,conflicts};
+}
+const trackerSync=(()=>{
+  const copy=v=>JSON.parse(JSON.stringify(v));
+  const groups={tasks:{keys:['tasks'],action:'saveTasks',label:'Task'},notes:{keys:['notes'],action:'saveNotes',label:'Note'},twitch:{keys:['lives','reports'],action:'saveTwitchData',label:'Twitch'}};
+  const actionGroup={saveTasks:'tasks',saveNotes:'notes',saveTwitchData:'twitch'};
+  let busy=null,status='In attesa di collegamento',serverReady=false;
+  let states={};
+  const storageKey=()=> 'focus_safe_sync_v1:'+ (typeof SCRIPT_URL==='string'?SCRIPT_URL:'');
+  let activeKey='';
+  function context(){const key=storageKey();if(key!==activeKey){activeKey=key;try{states=JSON.parse(localStorage.getItem(key)||'{}')}catch(e){states={}}serverReady=false;}return states;}
+  function persist(){localStorage.setItem(activeKey,JSON.stringify(states));}
+  function local(group){
+    const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)||'null')||f}catch(e){return f}};
+    if(group==='tasks')return {tasks:window.workTaskApi?copy(window.workTaskApi.list()):read('focus_work_tasks_v1',[])};
+    if(group==='notes')return {notes:read('focus_quick_notes_v1',[])};
+    const data=window.twitchTracker?window.twitchTracker.getData():read('focus_twitch_tracker_v1_live',{lives:[],reports:[]});return {lives:data.lives,reports:data.reports};
+  }
+  function state(group){context();if(!states[group]){const data=local(group);states[group]={base:null,pending:groups[group].keys.some(k=>data[k].length)?data:null,seq:0};persist()}return states[group]}
+  function notify(text){status=text;const el=document.getElementById('sync-detail');if(el)el.textContent=text;}
+  function apply(group,data){
+    if(group==='tasks'){if(window.replaceWorkTasks)window.replaceWorkTasks(copy(data.tasks));}
+    else if(group==='notes'){if(window.replaceQuickNotes)window.replaceQuickNotes(copy(data.notes));}
+    else {if(window.replaceTwitchData)window.replaceTwitchData(copy(data.lives),copy(data.reports));}
+  }
+  function remoteGroup(response,group){return group==='twitch'?{lives:response.twitchLives,reports:response.twitchReports}:{[group]:response[group]}}
+  async function request(params){
+    if(!SCRIPT_URL)return null;
+    const url=SCRIPT_URL;
+    try{const isGet=params.action==='get',controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
+      try{const res=await fetch(isGet?url+'?action=get&_ts='+Date.now():url,isGet?{cache:'no-store',signal:controller.signal}:{method:'POST',body:JSON.stringify(params),signal:controller.signal});const data=await res.json();if(url!==SCRIPT_URL)return null;return data;}finally{clearTimeout(timeout)}
+    }catch(e){return null}
+  }
+  function capture(group,data){
+    const st=state(group);st.pending=copy(data);st.seq++;delete st.conflict;persist();notify('Modifiche salvate sul dispositivo · sincronizzazione in attesa');
+  }
+  async function enqueue(params){
+    const group=actionGroup[params.action],data={};groups[group].keys.forEach(k=>data[k]=params[k]||[]);capture(group,data);
+    await flush();const st=state(group);return {ok:!st.pending,pending:!!st.pending,conflict:!!st.conflict};
+  }
+  async function process(){
+    context();for(const group of Object.keys(groups))state(group);
+    if(!SCRIPT_URL){notify('Solo su questo dispositivo · configura Google Sheets');return;}
+    for(let round=0;round<6;round++){
+      notify('Sincronizzazione con Google…');
+      const response=await request({action:'get'});
+      if(!response?.ok){notify('Connessione non riuscita · le modifiche restano sul dispositivo');return;}
+      if(!response.syncVersions){serverReady=false;notify('Aggiorna e pubblica Apps Script 8.5 · modifiche protette sul dispositivo');return;}
+      serverReady=true;
+      let retry=false;
+      for(const group of Object.keys(groups)){
+        const st=state(group),remote=remoteGroup(response,group);
+        if(!groups[group].keys.every(k=>Array.isArray(remote[k]))){notify('Risposta Google incompleta · nessun dato locale sostituito');return;}
+        if(!st.pending){st.base=copy(remote);persist();apply(group,remote);if(st.pending)retry=true;continue;}
+        const seq=st.seq,desired=copy(st.pending),plan=syncMerge(st.base,desired,remote);
+        if(plan.conflicts.length){st.conflict={remote:copy(remote),plan};persist();continue;}
+        delete st.conflict;
+        if(syncCanonical(plan.data)===syncCanonical(remote)){
+          st.base=copy(remote);st.pending=null;persist();apply(group,remote);if(st.pending)retry=true;continue;
+        }
+        const result=await request({action:groups[group].action,...plan.data,expectedVersion:response.syncVersions[group]});
+        if(!result?.ok){
+          if(result?.code==='SYNC_CONFLICT'){retry=true;continue;}
+          notify(result?.code==='SYNC_REQUIRED'?'Aggiorna Apps Script · modifiche sul dispositivo':'Salvataggio non confermato · modifiche conservate sul dispositivo');return;
+        }
+        // Se l’utente ha scritto durante la richiesta, mantiene il nuovo cambiamento.
+        if(st.seq!==seq){st.base=copy(desired);retry=true;}
+        else {st.base=copy(plan.data);st.pending=null;}
+        persist();if(!st.pending)apply(group,plan.data);
+      }
+      const conflicts=Object.keys(groups).filter(g=>state(g).conflict);
+      if(conflicts.length){notify('Da verificare: '+conflicts.map(g=>groups[g].label).join(', ')+' · premi Verifica conflitti');return;}
+      if(!retry&&!Object.keys(groups).some(g=>state(g).pending)){notify('Task, note e Twitch salvati su Google · '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));return;}
+    }
+    notify('Modifiche in attesa · nuovo tentativo automatico');
+  }
+  function flush(){if(busy)return busy;busy=process().catch(()=>notify('Sincronizzazione interrotta · conserva aperto il tracker e riprova')).finally(()=>{busy=null});return busy}
+  function download(){context();const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),syncState:states,local:{tasks:local('tasks'),notes:local('notes'),twitch:local('twitch')}},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tracker-recupero-sincronizzazione.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+  function review(){
+    const group=Object.keys(groups).find(g=>state(g).conflict);
+    if(!group){toast('Nessun conflitto da risolvere.');return;}
+    const st=state(group),snapshot=copy(st.conflict),seq=st.seq;
+    const dialog=document.createElement('dialog');dialog.style.cssText='width:min(720px,90vw);max-height:85vh;border:1px solid #cfbca8;border-radius:18px;padding:22px;background:#fffaf2;color:#49372c';
+    const heading=document.createElement('h2');heading.textContent=groups[group].label+': scegli le modifiche da conservare';dialog.append(heading);
+    const intro=document.createElement('p');intro.textContent='Solo gli elementi in conflitto richiedono una scelta. Le altre modifiche vengono unite. Puoi chiudere e decidere più tardi.';dialog.append(intro);
+    const choices=[];
+    snapshot.plan.conflicts.forEach(c=>{
+      const section=document.createElement('fieldset'),title=document.createElement('legend');title.textContent=c.local?.title||c.local?.text||c.remote?.title||c.remote?.text||c.id;section.append(title);
+      const select=document.createElement('select');select.add(new Option('— scegli —',''));select.add(new Option('Conserva questo dispositivo','local'));select.add(new Option('Conserva Google','remote'));section.append(select);choices.push({c,select});
+      for(const side of ['local','remote']){const details=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent=side==='local'?'Versione su questo dispositivo':'Versione su Google';pre.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';pre.textContent=c[side]===undefined?'Elemento eliminato':JSON.stringify(c[side],null,2);details.append(summary,pre);section.append(details)}dialog.append(section);
+    });
+    const close=document.createElement('button');close.className='btn';close.textContent='Più tardi';close.onclick=()=>dialog.close();
+    const save=document.createElement('button');save.className='btn btn-primary';save.textContent='Conferma scelte';save.onclick=()=>{
+      if(choices.some(x=>!x.select.value)){toast('Scegli una versione per ogni elemento.');return;}
+      if(st.seq!==seq){dialog.close();toast('Sono arrivate altre modifiche: riapri il confronto.');return;}
+      const merged=copy(snapshot.plan.data);
+      for(const {c,select} of choices){merged[c.collection]=merged[c.collection].filter(v=>syncRecordId(v)!==c.id);const value=c[select.value];if(value!==undefined)merged[c.collection].push(value)}
+      st.base=copy(snapshot.remote);capture(group,merged);apply(group,merged);dialog.close();flush();
+    };
+    dialog.append(close,save);dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+  }
+  function install(){
+    const panel=document.createElement('div');panel.style.cssText='padding:10px 16px;background:#f6eee3;color:#604c3e;border-bottom:1px solid #dfd0bf;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px';
+    const detail=document.createElement('span');detail.id='sync-detail';detail.textContent=status;detail.style.flex='1';panel.append(detail);
+    for(const [label,fn] of [['Sincronizza',flush],['Verifica conflitti',review],['Scarica copia locale',download]]){const b=document.createElement('button');b.className='btn btn-sm';b.type='button';b.textContent=label;b.onclick=fn;panel.append(b)}
+    document.body.prepend(panel);flush();
+    window.addEventListener('online',flush);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')flush()});
+    setInterval(()=>{if(document.visibilityState==='visible')flush()},30000);
+  }
+  document.addEventListener('DOMContentLoaded',install);
+  return {enqueue,flush,request,handles:action=>!!actionGroup[action],pending:()=>Object.values(context()).some(s=>s.pending),export:()=>copy(context())};
+})();
 let sessions=[],moods={},chart=null;
 let selectedCatColor='#EAD9C0';
 let SCRIPT_URL=localStorage.getItem('focus_script_url')||'';
@@ -1781,6 +1920,7 @@ async function saveEdit(){
 }
 
 async function api(params){
+  if(trackerSync.handles(params.action))return trackerSync.enqueue(params);
   if(!SCRIPT_URL){toast('Configura prima l\'URL!');return null;}
   try{const isGet=params.action==='get';const getUrl=SCRIPT_URL+'?action=get&_ts='+Date.now();const res=await fetch(isGet?getUrl:SCRIPT_URL,isGet?{method:'GET',cache:'no-store'}:{method:'POST',body:JSON.stringify(params)});return await res.json();}
   catch(err){toast('Errore di connessione.');setStatus('Errore di connessione','err');return null;}
@@ -1808,7 +1948,7 @@ async function loadSessions(){
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
     const backendOk=versionAtLeast(data.backendVersion,REQUIRED_BACKEND_VERSION);
-    if(versionBadge){versionBadge.textContent=backendOk?'v'+TRACKER_VERSION+' · sincronizzato':'v'+TRACKER_VERSION+' · Apps Script da aggiornare';versionBadge.title=backendOk?'Tracker e Apps Script aggiornati':'Serve Apps Script '+REQUIRED_BACKEND_VERSION+' o successivo';}
+    if(versionBadge){versionBadge.textContent=backendOk?'v'+TRACKER_VERSION:'v'+TRACKER_VERSION+' · Apps Script da aggiornare';versionBadge.title=backendOk?'Tracker e Apps Script aggiornati':'Serve Apps Script '+REQUIRED_BACKEND_VERSION+' o successivo';}
     if(!backendOk)toast('Tracker v'+TRACKER_VERSION+' attivo, ma Apps Script deve essere aggiornato alla versione '+REQUIRED_BACKEND_VERSION+' o successiva.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
     // categorie
@@ -1835,37 +1975,7 @@ async function loadSessions(){
       categories=JSON.parse(localStorage.getItem('focus_categories')||'[]');
       renderCategories();
     }
-    // task condivise: Sheets e' la fonte comune tra PC e cellulare.
-    // Se il backend non e' ancora aggiornato, resta attivo il fallback locale.
-    if(Array.isArray(data.tasks)){
-      let localTasks=[];
-      try{localTasks=JSON.parse(localStorage.getItem('focus_work_tasks_v1')||'[]');if(!Array.isArray(localTasks))localTasks=[];}catch(e){localTasks=[];}
-      if(data.tasks.length||!localTasks.length){
-        localStorage.setItem('focus_work_tasks_v1',JSON.stringify(data.tasks));
-        if(window.replaceWorkTasks)window.replaceWorkTasks(data.tasks);
-      }else{
-        // Prima migrazione: il foglio e' vuoto ma questo dispositivo ha gia' task.
-        // Caricale su Sheets senza cancellare la copia locale.
-        api({action:'saveTasks',tasks:localTasks}).then(r=>{if(r&&r.ok)toast('Task locali sincronizzate con Google Sheets.')});
-      }
-    }
-    // note rapide condivise, con migrazione protetta della vecchia copia locale
-    if(Array.isArray(data.notes)){
-      let localNotes=[];
-      try{localNotes=JSON.parse(localStorage.getItem('focus_quick_notes_v1')||'[]');if(!Array.isArray(localNotes))localNotes=[];}catch(e){localNotes=[];}
-      if(data.notes.length||!localNotes.length){
-        localStorage.setItem('focus_quick_notes_v1',JSON.stringify(data.notes));
-        if(window.replaceQuickNotes)window.replaceQuickNotes(data.notes);
-      }else{
-        api({action:'saveNotes',notes:localNotes}).then(r=>{if(r&&r.ok)toast('Note locali sincronizzate con Google Sheets.')});
-      }
-    }
-    // dati Twitch condivisi: Google Sheets e' la fonte comune tra i dispositivi.
-    // Se il modulo Twitch non e' ancora inizializzato, i dati restano in attesa.
-    if(Array.isArray(data.twitchLives)&&Array.isArray(data.twitchReports)){
-      window.__twitchRemoteData={lives:data.twitchLives,reports:data.twitchReports};
-      if(window.replaceTwitchData)window.replaceTwitchData(data.twitchLives,data.twitchReports);
-    }
+    await trackerSync.flush();
     // umore
     if(data.moods&&Object.keys(data.moods).length>0){
       // normalizza chiavi date da Sheets
@@ -2219,7 +2329,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   const editor=document.createElement('div');editor.className='task-editor hidden';editor.id='task-editor';editor.innerHTML='<form class="task-editor-box" id="task-editor-form"><h2>Nuova attività</h2><input id="task-id" type="hidden"><div class="task-editor-grid"><div class="field full"><label>attività</label><input id="task-title" required placeholder="Cosa devi fare?"></div><div class="field"><label>progetto</label><select id="task-project"><option value="">— nessun progetto —</option></select></div><div class="field"><label>scadenza</label><input id="task-due" type="date"></div><div class="field"><label>durata prevista</label><input id="task-duration" placeholder="es. 1h 30m"></div><div class="field"><label>priorità</label><select id="task-priority"><option value="media">Media</option><option value="alta">Alta</option><option value="bassa">Bassa</option></select></div><div class="field full"><label>link VGen</label><input id="task-vgen" type="url" placeholder="https://…"></div><div class="field full"><label>link Notion</label><input id="task-notion" type="url" placeholder="https://…"></div><div class="field full"><label>link Drive o cartella</label><input id="task-drive" type="url" placeholder="https://…"></div></div><div class="task-editor-actions"><button class="btn" type="button" id="task-editor-cancel">Annulla</button><button class="btn btn-primary" type="submit">Salva attività</button></div></form>';document.body.appendChild(editor);
   const timerCard=document.getElementById('timer-card');document.getElementById('home-timer-slot').appendChild(timerCard);
   function safeUrl(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
-  function saveTasks(){localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(SCRIPT_URL)api({action:'saveTasks',tasks:workTasks}).then(r=>{if(!r||!r.ok)toast('Task salvata solo su questo dispositivo: aggiorna Apps Script.')});if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions()}
+  function saveTasks(){localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));api({action:'saveTasks',tasks:workTasks}).then(r=>{if(!r||!r.ok)toast('Task conservata sul dispositivo: controlla lo stato della sincronizzazione.')});if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions()}
   function openEditor(task){const t=task||{};document.getElementById('task-id').value=t.id||'';document.getElementById('task-title').value=t.title||'';document.getElementById('task-due').value=t.due||'';document.getElementById('task-duration').value=t.duration||'';document.getElementById('task-priority').value=t.priority||'media';document.getElementById('task-vgen').value=t.links?.vgen||'';document.getElementById('task-notion').value=t.links?.notion||'';document.getElementById('task-drive').value=t.links?.drive||'';const sel=document.getElementById('task-project');sel.innerHTML='<option value="">— nessun progetto —</option>'+projects.filter(p=>!p.archived).map(p=>'<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>').join('');sel.value=t.project||'';editor.classList.remove('hidden');if(window.populateGenericLinks)window.populateGenericLinks(t);document.getElementById('task-title').focus()}
   function closeEditor(){editor.classList.add('hidden');document.getElementById('task-editor-form').reset()}
   function renderTasks(){const list=document.getElementById('home-task-list');const today=new Date().toISOString().slice(0,10);const visible=workTasks.filter(t=>!t.done).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).slice(0,6);if(!visible.length)list.innerHTML='<div class="home-empty">Nessuna attività aperta. Aggiungine una quando vuoi.</div>';else list.innerHTML=visible.map(t=>{const links=t.links||{};const linkHtml=[['VGen',links.vgen],['Notion',links.notion],['Drive',links.drive]].filter(x=>safeUrl(x[1])).map(x=>'<a class="home-chip link" href="'+esc(safeUrl(x[1]))+'" target="_blank" rel="noopener">'+x[0]+' ↗</a>').join('');return '<div class="home-task"><button class="home-task-check" data-done="'+esc(t.id)+'" title="Completa"></button><div><div class="home-task-title" data-edit="'+esc(t.id)+'">'+esc(t.title)+'</div><div class="home-task-meta">'+(t.project?'<span class="home-chip">'+esc(t.project)+'</span>':'')+(t.priority==='alta'?'<span class="home-chip" style="color:var(--danger)">priorità alta</span>':'')+linkHtml+'</div></div><span class="home-task-time">'+(t.due===today?'Oggi':t.duration||'')+'</span></div>'}).join('');list.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{const t=workTasks.find(x=>x.id===b.dataset.done);if(t){t.done=true;t.completedAt=new Date().toISOString();saveTasks()}});list.querySelectorAll('[data-edit]').forEach(e=>e.onclick=()=>openEditor(workTasks.find(x=>x.id===e.dataset.edit)));const done=workTasks.filter(t=>t.done).length,total=workTasks.length,pct=total?Math.round(done/total*100):0;document.getElementById('home-progress-label').textContent=done+' su '+total+' completate';document.getElementById('home-progress-bar').style.width=pct+'%';document.getElementById('home-progress-pct').textContent=pct+'%';document.getElementById('home-done-count').textContent=done}
@@ -2227,10 +2337,10 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
   function renderHomeStats(){const today=new Date().toISOString().slice(0,10),todaySessions=sessions.filter(s=>s.date===today),mins=todaySessions.reduce((a,s)=>a+Number(s.minutes||0),0);document.getElementById('home-today-time').textContent=mins?toHours(mins):'—';document.getElementById('home-session-count').textContent=todaySessions.length}
   document.getElementById('home-new-task').onclick=()=>openEditor();document.getElementById('home-new-task-inline').onclick=()=>openEditor();document.getElementById('task-editor-cancel').onclick=closeEditor;editor.onclick=e=>{if(e.target===editor)closeEditor()};document.getElementById('task-editor-form').onsubmit=e=>{e.preventDefault();const id=document.getElementById('task-id').value||String(Date.now());const old=workTasks.find(t=>t.id===id);const task={id,title:document.getElementById('task-title').value.trim(),project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links:{vgen:document.getElementById('task-vgen').value.trim(),notion:document.getElementById('task-notion').value.trim(),drive:document.getElementById('task-drive').value.trim()},done:old?.done||false,createdAt:old?.createdAt||new Date().toISOString()};if(old)Object.assign(old,task);else workTasks.unshift(task);saveTasks();closeEditor()};document.getElementById('home-save-note').onclick=()=>{const input=document.getElementById('home-note-input'),text=input.value.trim();if(!text)return;quickNotes.unshift({text,at:new Date().toISOString()});quickNotes=quickNotes.slice(0,20);localStorage.setItem(NOTE_KEY,JSON.stringify(quickNotes));input.value='';renderNotes()};
   const originalRefresh=window.refresh;window.refresh=function(){originalRefresh();renderHomeStats()};
-  const originalBuildBackup=window.buildBackup;window.buildBackup=function(){const b=originalBuildBackup();b.tasks=workTasks;b.quickNotes=quickNotes;b.timerPreferences={longBreak:document.getElementById('timer-pausa-lunga').value,longBreakEvery:document.getElementById('timer-pausa-lunga-ogni').value};return b};
+  const originalBuildBackup=window.buildBackup;window.buildBackup=function(){const b=originalBuildBackup();b.tasks=workTasks;b.quickNotes=JSON.parse(localStorage.getItem('focus_quick_notes_v1')||'[]');b.twitch=window.twitchTracker?window.twitchTracker.getData():null;b.syncState=trackerSync.export();b.timerPreferences={longBreak:document.getElementById('timer-pausa-lunga').value,longBreakEvery:document.getElementById('timer-pausa-lunga-ogni').value};return b};
   window.importWorkDashboardBackup=function(backup){if(Array.isArray(backup.tasks)){workTasks=backup.tasks;localStorage.setItem(TASK_KEY,JSON.stringify(workTasks))}if(Array.isArray(backup.quickNotes)){quickNotes=backup.quickNotes;localStorage.setItem(NOTE_KEY,JSON.stringify(quickNotes))}if(backup.timerPreferences){const lb=document.getElementById('timer-pausa-lunga'),le=document.getElementById('timer-pausa-lunga-ogni');if(lb&&backup.timerPreferences.longBreak)lb.value=backup.timerPreferences.longBreak;if(le&&backup.timerPreferences.longBreakEvery)le.value=backup.timerPreferences.longBreakEvery}renderTasks();renderNotes()};
   window.getWorkDashboardTasks=function(){return workTasks.slice()};
-  window.replaceWorkTasks=function(tasks){const incoming=Array.isArray(tasks)?tasks.slice():[],cleaned=clearCompletedFromPreviousDays(incoming),removed=cleaned.length!==incoming.length;workTasks=cleaned;localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions();if(removed&&SCRIPT_URL)api({action:'saveTasks',tasks:workTasks}).then(r=>{if(r&&r.ok)toast('Task completate del giorno precedente eliminate.')})};
+  window.replaceWorkTasks=function(tasks){const incoming=Array.isArray(tasks)?tasks.slice():[],cleaned=clearCompletedFromPreviousDays(incoming),removed=cleaned.length!==incoming.length;workTasks=cleaned;localStorage.setItem(TASK_KEY,JSON.stringify(workTasks));if(window.renderWorkTasksGeneric)window.renderWorkTasksGeneric(workTasks);else renderTasks();if(window.refreshTimerTaskOptions)window.refreshTimerTaskOptions();if(removed)api({action:'saveTasks',tasks:workTasks}).then(r=>{if(r&&r.ok)toast('Task completate del giorno precedente eliminate.')})};
   window.workTaskApi={list:function(){return workTasks},save:saveTasks,open:openEditor,close:closeEditor};
   renderTasks();renderNotes();renderHomeStats();showPage('home');
 })();
@@ -2421,7 +2531,7 @@ html:before{content:'TRACKER_VERSION_9.4';display:none}
   let syncedNotes=[];
   try{syncedNotes=JSON.parse(localStorage.getItem('focus_quick_notes_v1')||'[]');if(!Array.isArray(syncedNotes))syncedNotes=[]}catch(e){syncedNotes=[]}
   function renderSyncedNotes(){const el=document.getElementById('home-note-list');el.innerHTML=syncedNotes.slice(0,20).map(n=>'<div class="home-note">'+esc(n.text)+'<br><small>'+new Date(n.at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</small><button class="home-note-delete" data-note-id="'+esc(n.id||n.at)+'" title="Elimina nota">×</button></div>').join('');el.querySelectorAll('[data-note-id]').forEach(b=>b.onclick=()=>{syncedNotes=syncedNotes.filter(n=>String(n.id||n.at)!==String(b.dataset.noteId));saveSyncedNotes()})}
-  function saveSyncedNotes(){localStorage.setItem('focus_quick_notes_v1',JSON.stringify(syncedNotes));renderSyncedNotes();if(SCRIPT_URL)api({action:'saveNotes',notes:syncedNotes}).then(r=>{if(!r||!r.ok)toast('Nota salvata solo su questo dispositivo.')})}
+  function saveSyncedNotes(){localStorage.setItem('focus_quick_notes_v1',JSON.stringify(syncedNotes));renderSyncedNotes();api({action:'saveNotes',notes:syncedNotes}).then(r=>{if(!r||!r.ok)toast('Nota salvata solo su questo dispositivo.')})}
   window.replaceQuickNotes=function(notes){syncedNotes=Array.isArray(notes)?notes.slice():[];localStorage.setItem('focus_quick_notes_v1',JSON.stringify(syncedNotes));renderSyncedNotes()};
   document.getElementById('home-save-note').onclick=()=>{const input=document.getElementById('home-note-input'),text=input.value.trim();if(!text)return;const at=new Date().toISOString();syncedNotes.unshift({id:String(Date.now()),text,at});syncedNotes=syncedNotes.slice(0,20);input.value='';saveSyncedNotes()};
   renderSyncedNotes();
@@ -2497,9 +2607,9 @@ html:before{content:'TRACKER_VERSION_9.4';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.4.2';
-const REQUIRED_BACKEND_VERSION='8.4';
-const TRACKER_CACHE_MARK='v9-4-2-flow-update';
+const TRACKER_VERSION='9.5';
+const REQUIRED_BACKEND_VERSION='8.5';
+const TRACKER_CACHE_MARK='v9-5-safe-sync';
 function versionAtLeast(current,required){
   const a=String(current||'0').split('.').map(n=>parseInt(n,10)||0),b=String(required||'0').split('.').map(n=>parseInt(n,10)||0),len=Math.max(a.length,b.length);
   for(let i=0;i<len;i++){const av=a[i]||0,bv=b[i]||0;if(av>bv)return true;if(av<bv)return false}return true;
@@ -2664,10 +2774,10 @@ if('serviceWorker' in navigator){
   function saveStore(){localStorage.setItem(STORAGE_KEY,JSON.stringify(store))}
   async function syncStore(){
     saveStore();
-    if(!SCRIPT_URL)return{ok:false,localOnly:true};
+    
     const result=await api({action:'saveTwitchData',lives:store.lives,reports:store.reports});
     if(!result||!result.ok){
-      toast('Dati Twitch salvati solo su questo dispositivo. Aggiorna o controlla Apps Script.');
+      toast('Dati Twitch conservati sul dispositivo: controlla lo stato della sincronizzazione.');
       return{ok:false};
     }
     return result;
