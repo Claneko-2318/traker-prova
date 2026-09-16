@@ -1244,17 +1244,17 @@ function selectCatColor(el){
 }
 // --- progetti: oggetti con tracciamento commissione opzionale ---
 function normProject(p){
-  if(typeof p==='object'&&p!==null)return{name:p.name||'',fee:p.fee===0||p.fee?Number(p.fee):'',archived:!!p.archived,type:p.type||'',platformFeePct:p.platformFeePct===0||p.platformFeePct?Number(p.platformFeePct):'',platformFeeFixed:p.platformFeeFixed===0||p.platformFeeFixed?Number(p.platformFeeFixed):'',commissionTracking:!!p.commissionTracking,commissionRate:p.commissionRate===0||p.commissionRate?Number(p.commissionRate):''};
+  if(typeof p==='object'&&p!==null)return{name:p.name||'',fee:p.fee===0||p.fee?Number(p.fee):'',archived:!!p.archived,type:p.type||'',platformFeePct:p.platformFeePct===0||p.platformFeePct?Number(p.platformFeePct):'',platformFeeFixed:p.platformFeeFixed===0||p.platformFeeFixed?Number(p.platformFeeFixed):'',commissionTracking:!!p.commissionTracking,commissionRate:p.commissionRate===0||p.commissionRate?Number(p.commissionRate):'',commissionPrice:p.commissionPrice===0||p.commissionPrice?Number(p.commissionPrice):''};
   const s=String(p);
   if(s.includes('|')){
     const parts=s.split('|');
     let type='';try{type=decodeURIComponent(parts[3]||'');}catch(err){type=parts[3]||'';}
-    return{name:parts[0],fee:parts[1]!==''&&parts[1]!==undefined?Number(parts[1]):'',archived:parts[2]==='1',type,platformFeePct:parts[4]!==''&&parts[4]!==undefined?Number(parts[4]):'',platformFeeFixed:parts[5]!==''&&parts[5]!==undefined?Number(parts[5]):'',commissionTracking:parts[6]==='1',commissionRate:parts[7]!==''&&parts[7]!==undefined?Number(parts[7]):''};
+    return{name:parts[0],fee:parts[1]!==''&&parts[1]!==undefined?Number(parts[1]):'',archived:parts[2]==='1',type,platformFeePct:parts[4]!==''&&parts[4]!==undefined?Number(parts[4]):'',platformFeeFixed:parts[5]!==''&&parts[5]!==undefined?Number(parts[5]):'',commissionTracking:parts[6]==='1',commissionRate:parts[7]!==''&&parts[7]!==undefined?Number(parts[7]):'',commissionPrice:parts[8]!==''&&parts[8]!==undefined?Number(parts[8]):''};
   }
-  return{name:s,fee:'',archived:false,type:'',platformFeePct:'',platformFeeFixed:'',commissionTracking:false,commissionRate:''};
+  return{name:s,fee:'',archived:false,type:'',platformFeePct:'',platformFeeFixed:'',commissionTracking:false,commissionRate:'',commissionPrice:''};
 }
 function normProjects(arr){return(arr||[]).map(normProject).filter(p=>p.name);}
-function encodeProj(p){return p.name+'|'+(p.fee===''||p.fee==null?'':p.fee)+'|'+(p.archived?'1':'')+'|'+encodeURIComponent(p.type||'')+'|'+(p.platformFeePct===''||p.platformFeePct==null?'':p.platformFeePct)+'|'+(p.platformFeeFixed===''||p.platformFeeFixed==null?'':p.platformFeeFixed)+'|'+(p.commissionTracking?'1':'0')+'|'+(p.commissionRate===''||p.commissionRate==null?'':p.commissionRate);}
+function encodeProj(p){return p.name+'|'+(p.fee===''||p.fee==null?'':p.fee)+'|'+(p.archived?'1':'')+'|'+encodeURIComponent(p.type||'')+'|'+(p.platformFeePct===''||p.platformFeePct==null?'':p.platformFeePct)+'|'+(p.platformFeeFixed===''||p.platformFeeFixed==null?'':p.platformFeeFixed)+'|'+(p.commissionTracking?'1':'0')+'|'+(p.commissionRate===''||p.commissionRate==null?'':p.commissionRate)+'|'+(p.commissionPrice===''||p.commissionPrice==null?'':p.commissionPrice);}
 function saveProjects(){
   localStorage.setItem('focus_projects',JSON.stringify(projects));
   if(SCRIPT_URL) api({action:'saveProjects',projects:projects.map(encodeProj)}).catch(()=>{});
@@ -1286,7 +1286,7 @@ function addProject(){
   if(!val)return;
   if(val.includes('|')){toast('Il carattere | non è consentito nel nome.');return;}
   if(projects.some(p=>p.name===val)){toast('Già presente.');return;}
-  projects.push({name:val,fee:'',archived:false,type:'',platformFeePct:'',platformFeeFixed:'',commissionTracking:false,commissionRate:''});
+  projects.push({name:val,fee:'',archived:false,type:'',platformFeePct:'',platformFeeFixed:'',commissionTracking:false,commissionRate:'',commissionPrice:''});
   saveProjects();renderProjects();renderProjectsPage();
   document.getElementById('inp-new-proj').value='';
 }
@@ -1412,8 +1412,8 @@ function moneyIt(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString
 function projectMinutes(name){return getLinkedSessions(name).reduce((sum,s)=>sum+Number(s.minutes||0),0);}
 function getTaskLinkedSessions(task){if(!task)return[];return sessions.filter(s=>{const sid=s.taskId||s.taskID||s.TaskID||'';if(sid)return String(sid)===String(task.id);return !sid&&s.task&&String(s.task)===String(task.title||'');});}
 function taskMinutes(task){return getTaskLinkedSessions(task).reduce((sum,s)=>sum+Number(s.minutes||0),0);}
-function commissionCalculation(minutes,rate){const mins=Math.max(0,Number(minutes)||0),hourly=Math.max(0,Number(rate)||0);return{minutes:mins,hours:mins/60,rate:hourly,total:(mins/60)*hourly};}
-function saveProjectCommission(i,field,value){const p=projects[i];if(!p)return;if(field==='commissionTracking'){p.commissionTracking=!!value;}else if(field==='commissionRate'){if(value===''){p.commissionRate='';}else{const n=Number(value);if(!Number.isFinite(n)||n<0){toast('Tariffa non valida.');renderProjectsPage();return;}p.commissionRate=n;}}saveProjects();renderProjectsPage();}
+function commissionHourlyResult(minutes,price){const mins=Math.max(0,Number(minutes)||0),amount=Math.max(0,Number(price)||0),hours=mins/60;return{minutes:mins,hours,price:amount,hourly:hours>0?amount/hours:0};}
+function saveProjectCommission(i,field,value){const p=projects[i];if(!p)return;if(field==='commissionTracking'){p.commissionTracking=!!value;}else if(field==='commissionPrice'){if(value===''){p.commissionPrice='';}else{const n=Number(value);if(!Number.isFinite(n)||n<0){toast('Prezzo non valido.');renderProjectsPage();return;}p.commissionPrice=n;}}saveProjects();renderProjectsPage();}
 
 function saveCategories(){
   localStorage.setItem('focus_categories',JSON.stringify(categories));
@@ -2448,7 +2448,7 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 </script>
 <style>
 /* Gerarchia task, note sincronizzate e rifiniture tablet */
-html:before{content:'TRACKER_VERSION_9.8';display:none}
+html:before{content:'TRACKER_VERSION_9.9';display:none}
 #home-new-task-inline{display:none!important}
 .app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
 .task-parent-fields{grid-column:1/-1}
@@ -2502,7 +2502,7 @@ html:before{content:'TRACKER_VERSION_9.8';display:none}
   const genericLinks=editorGrid.querySelector('.generic-links');
   const commissionFields=document.createElement('div');
   commissionFields.className='task-commission-fields';
-  commissionFields.innerHTML='<label class="task-commission-toggle"><input id="task-commission-tracking" type="checkbox"> <span>Questa task è una commissione: calcola quanto avrei dovuto farla pagare</span></label><div class="task-commission-rate-row hidden" id="task-commission-rate-row"><div class="field"><label>tariffa oraria (€)</label><input id="task-commission-rate" type="number" min="0" step="0.50" placeholder="es. 12"></div><div class="task-commission-summary" id="task-commission-summary">Nessuna ora registrata su questa task.</div></div>';
+  commissionFields.innerHTML='<label class="task-commission-toggle"><input id="task-commission-tracking" type="checkbox"> <span>Questa task è una commissione: calcola quanto è valsa all’orario</span></label><div class="task-commission-rate-row hidden" id="task-commission-rate-row"><div class="field"><label>prezzo della commissione (€)</label><input id="task-commission-price" type="number" min="0" step="0.50" placeholder="es. 45"></div><div class="task-commission-summary" id="task-commission-summary">Nessuna ora registrata su questa task.</div></div>';
   editorGrid.insertBefore(commissionFields,genericLinks||null);
   const parentFields=document.createElement('div');
   parentFields.className='task-parent-fields';
@@ -2510,7 +2510,7 @@ html:before{content:'TRACKER_VERSION_9.8';display:none}
   editorGrid.insertBefore(parentFields,genericLinks||null);
 
   const originalOpen=taskApi.open;
-  function updateTaskCommissionPreview(task){const row=document.getElementById('task-commission-rate-row'),summary=document.getElementById('task-commission-summary'),toggle=document.getElementById('task-commission-tracking'),rateInput=document.getElementById('task-commission-rate');if(!row||!summary||!toggle||!rateInput)return;row.classList.toggle('hidden',!toggle.checked);if(!toggle.checked)return;const mins=task&&task.id?taskMinutes(task):0,rate=Math.max(0,Number(rateInput.value)||0),calc=commissionCalculation(mins,rate);if(!mins){summary.innerHTML='Nessuna ora registrata su questa task. Quando colleghi delle sessioni, il prezzo si aggiornerà automaticamente.';return;}summary.innerHTML='<span>'+toHours(calc.minutes)+' registrate × '+rate.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h</span><br><strong>'+moneyIt(calc.total)+'</strong> <span>da far pagare in base al tempo</span>';}
+  function updateTaskCommissionPreview(task){const row=document.getElementById('task-commission-rate-row'),summary=document.getElementById('task-commission-summary'),toggle=document.getElementById('task-commission-tracking'),priceInput=document.getElementById('task-commission-price');if(!row||!summary||!toggle||!priceInput)return;row.classList.toggle('hidden',!toggle.checked);if(!toggle.checked)return;const mins=task&&task.id?taskMinutes(task):0,price=Math.max(0,Number(priceInput.value)||0),calc=commissionHourlyResult(mins,price);if(!mins){summary.innerHTML=price>0?'Hai segnato <strong>'+moneyIt(price)+'</strong>. Appena colleghi delle sessioni, calcolerò quanto vale all’orario.':'Nessuna ora registrata su questa task. Inserisci il prezzo e collega le sessioni.';return;}if(!price){summary.innerHTML='<span>'+toHours(calc.minutes)+' registrate.</span><br><span>Inserisci quanto hai fatto pagare la commissione per ottenere la tariffa oraria risultante.</span>';return;}summary.innerHTML='<span>'+moneyIt(calc.price)+' ÷ '+toHours(calc.minutes)+'</span><br><strong>'+calc.hourly.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h</strong> <span>tariffa oraria risultante</span>'; }
   taskApi.open=function(task){
     originalOpen(task);
     const current=task||{};
@@ -2519,7 +2519,7 @@ html:before{content:'TRACKER_VERSION_9.8';display:none}
     let changed=true;while(changed){changed=false;taskApi.list().forEach(t=>{if(t.parentId&&excluded.has(String(t.parentId))&&!excluded.has(String(t.id))){excluded.add(String(t.id));changed=true}})}
     parent.innerHTML='<option value="">— nessuna, task indipendente —</option>'+taskApi.list().filter(t=>!t.archived&&!excluded.has(String(t.id))).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>').join('');
     parent.value=current.parentId||'';
-    const tracking=document.getElementById('task-commission-tracking'),rate=document.getElementById('task-commission-rate');tracking.checked=!!current.commissionTracking;rate.value=current.commissionRate===''||current.commissionRate==null?'':current.commissionRate;updateTaskCommissionPreview(current);tracking.onchange=()=>updateTaskCommissionPreview(current);rate.oninput=()=>updateTaskCommissionPreview(current);
+    const tracking=document.getElementById('task-commission-tracking'),price=document.getElementById('task-commission-price');tracking.checked=!!current.commissionTracking;price.value=current.commissionPrice===''||current.commissionPrice==null?'':current.commissionPrice;updateTaskCommissionPreview(current);tracking.onchange=()=>updateTaskCommissionPreview(current);price.oninput=()=>updateTaskCommissionPreview(current);
   };
   document.getElementById('home-new-task').onclick=()=>taskApi.open();
 
@@ -2538,8 +2538,8 @@ html:before{content:'TRACKER_VERSION_9.8';display:none}
     const timeLabel=[archivedLabel|| (dueLabel?'📅 '+dueLabel:''),t.duration?'◷ '+t.duration:''].filter(Boolean).join(' · ');
     const priority=t.priority||'media',priorityLabel=priority==='alta'?'Priorità alta':priority==='bassa'?'Priorità bassa':'Priorità media';
     const priorityChip='<span class="home-chip priority-'+(priority==='alta'?'high':priority==='bassa'?'low':'medium')+'">'+priorityLabel+'</span>';
-    const commissionData=t.commissionTracking?commissionCalculation(taskMinutes(t),t.commissionRate):null;
-    const commissionChip=commissionData&&commissionData.rate>0?'<span class="home-chip commission-chip" title="'+esc(toHours(commissionData.minutes)+' × '+commissionData.rate.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h')+'">💶 '+moneyIt(commissionData.total)+' suggeriti</span>':'';
+    const commissionData=t.commissionTracking?commissionHourlyResult(taskMinutes(t),t.commissionPrice):null;
+    const commissionChip=commissionData&&commissionData.price>0&&commissionData.minutes>0?'<span class="home-chip commission-chip" title="'+esc(moneyIt(commissionData.price)+' ÷ '+toHours(commissionData.minutes))+'">💶 '+commissionData.hourly.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h</span>':'';
     const title=hasChildren?'<div class="task-title-line has-children"><button class="task-collapse-icon" data-toggle-children="'+esc(t.id)+'" title="'+(t.collapsed?'Mostra':'Nascondi')+' sotto-task">'+(t.collapsed?'▸':'▾')+'</button><div class="home-task-title" data-toggle-children="'+esc(t.id)+'">'+esc(t.title)+'</div><button class="task-edit-btn" data-edit-task="'+esc(t.id)+'" title="Modifica task">✎</button></div>':'<div class="task-title-line"><div class="home-task-title" data-edit-task="'+esc(t.id)+'">'+esc(t.title)+'</div></div>';
     const siblings=siblingTasks(tasks,t.parentId||'',!document.querySelector('.completed-toggle')?.classList.contains('active')),position=siblings.findIndex(x=>String(x.id)===String(t.id));
     const orderControls=t.archived?'':'<div class="task-order-controls"><button class="task-order-btn" type="button" data-order-task="'+esc(t.id)+'" data-order-direction="up" title="Sposta su" aria-label="Sposta task su"'+(position<=0?' disabled':'')+'>▲</button><button class="task-order-btn" type="button" data-order-task="'+esc(t.id)+'" data-order-direction="down" title="Sposta giù" aria-label="Sposta task giù"'+(position<0||position>=siblings.length-1?' disabled':'')+'>▼</button></div>';
@@ -2579,8 +2579,8 @@ html:before{content:'TRACKER_VERSION_9.8';display:none}
     e.preventDefault();
     const id=document.getElementById('task-id').value||String(Date.now()),tasks=taskApi.list(),old=tasks.find(t=>String(t.id)===String(id)),links={};
     document.querySelectorAll('.generic-link-row').forEach((row,index)=>{const label=row.querySelector('.generic-link-label').value.trim()||('Link '+(index+1)),url=row.querySelector('.generic-link-url').value.trim();if(safeUrl(url)){let key=label,n=2;while(links[key])key=label+' '+n++;links[key]=safeUrl(url)}});
-    const commissionTracking=document.getElementById('task-commission-tracking').checked,commissionRateValue=document.getElementById('task-commission-rate').value,commissionRate=commissionRateValue===''?'':Math.max(0,Number(commissionRateValue)||0);
-    const task={id,title:document.getElementById('task-title').value.trim(),parentId:document.getElementById('task-parent').value,project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links,commissionTracking,commissionRate,done:old?.done||false,completedAt:old?.completedAt||'',createdAt:old?.createdAt||new Date().toISOString(),manualOrder:old?.manualOrder,archived:old?.archived||false,archivedAt:old?.archivedAt||''};
+    const commissionTracking=document.getElementById('task-commission-tracking').checked,commissionPriceValue=document.getElementById('task-commission-price').value,commissionPrice=commissionPriceValue===''?'':Math.max(0,Number(commissionPriceValue)||0);
+    const task={id,title:document.getElementById('task-title').value.trim(),parentId:document.getElementById('task-parent').value,project:document.getElementById('task-project').value,due:document.getElementById('task-due').value,duration:document.getElementById('task-duration').value.trim(),priority:document.getElementById('task-priority').value,links,commissionTracking,commissionPrice,done:old?.done||false,completedAt:old?.completedAt||'',createdAt:old?.createdAt||new Date().toISOString(),manualOrder:old?.manualOrder,archived:old?.archived||false,archivedAt:old?.archivedAt||''};
     if(!task.title)return;
     const oldParent=old?.parentId||'';
     if(old)Object.assign(old,task);else{initializeSiblingOrder(tasks,task.parentId);task.manualOrder=Math.max(-1,...siblingTasks(tasks,task.parentId,false).map(t=>Number(t.manualOrder)||0))+1;tasks.unshift(task)}
@@ -2604,12 +2604,13 @@ html:before{content:'TRACKER_VERSION_9.8';display:none}
     function validLink(url){try{const u=new URL(url);return u.protocol==='http:'||u.protocol==='https:'?u.href:''}catch(e){return''}}
     function card(p,i){
       const linked=getLinkedSessions(p.name),mins=linked.reduce((a,s)=>a+Number(s.minutes||0),0),pt=tasks.filter(t=>t.project===p.name),urls={};
-      const commission=commissionCalculation(mins,p.commissionRate);
+      const projectPrice=p.commissionPrice!==''&&p.commissionPrice!=null?p.commissionPrice:(p.archived&&p.fee!==''&&p.fee!=null?p.fee:'');
+      const commission=commissionHourlyResult(mins,projectPrice);
       pt.forEach(t=>Object.entries(t.links||{}).forEach(([k,v])=>{if(validLink(v)&&!urls[k])urls[k]=validLink(v)}));
       const links=Object.entries(urls).map(([k,v])=>'<a class="home-chip link" href="'+esc(v)+'" target="_blank" rel="noopener">'+esc(k)+' ↗</a>').join('');
       const rows=linked.slice(0,6).map(s=>'<div class="project-preview-session"><span>'+fmt(s.date)+'</span><span>'+esc(s.category||'Sessione')+'</span><b>'+toHours(Number(s.minutes||0))+'</b></div>').join('');
       const fee=p.archived?'<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span style="font-size:11px;color:var(--muted)">compenso realmente ricevuto</span><input type="number" id="proj-fee-'+i+'" min="0" step="0.01" placeholder="—" value="'+(p.fee===''||p.fee==null?'':p.fee)+'" style="width:90px"><span>€</span><button class="btn btn-sm" onclick="saveProjFee('+i+')">salva</button></div>':'';
-      const commissionBox='<div class="project-commission-box"><div class="project-commission-top"><label><input type="checkbox" '+(p.commissionTracking?'checked':'')+' onchange="saveProjectCommission('+i+',\'commissionTracking\',this.checked)"> calcola il prezzo di questa commissione dalle ore lavorate</label>'+(p.commissionTracking&&commission.rate>0?'<span class="home-chip commission-chip">'+moneyIt(commission.total)+' suggeriti</span>':'')+'</div><div class="project-commission-fields '+(p.commissionTracking?'':'hidden')+'"><div class="field"><label>tariffa oraria (€)</label><input type="number" min="0" step="0.50" placeholder="es. 12" value="'+(p.commissionRate===''||p.commissionRate==null?'':p.commissionRate)+'" onchange="saveProjectCommission('+i+',\'commissionRate\',this.value)"></div><div class="project-commission-result"><span>'+(mins?toHours(mins)+' registrate':'Nessuna ora registrata')+(p.commissionTracking&&commission.rate>0?' × '+commission.rate.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h':'')+'</span><strong>'+(p.commissionTracking&&commission.rate>0?moneyIt(commission.total):'—')+'</strong><span>prezzo calcolato in base al tempo</span></div></div></div>';
+      const commissionBox='<div class="project-commission-box"><div class="project-commission-top"><label><input type="checkbox" '+(p.commissionTracking?'checked':'')+' onchange="saveProjectCommission('+i+',\'commissionTracking\',this.checked)"> calcola quanto questa commissione è valsa all’orario</label>'+(p.commissionTracking&&commission.price>0&&commission.minutes>0?'<span class="home-chip commission-chip">'+commission.hourly.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h</span>':'')+'</div><div class="project-commission-fields '+(p.commissionTracking?'':'hidden')+'"><div class="field"><label>prezzo della commissione (€)</label><input type="number" min="0" step="0.50" placeholder="es. 45" value="'+(projectPrice===''||projectPrice==null?'':projectPrice)+'" onchange="saveProjectCommission('+i+',\'commissionPrice\',this.value)"></div><div class="project-commission-result"><span>'+(mins?toHours(mins)+' registrate':'Nessuna ora registrata')+(p.commissionTracking&&commission.price>0&&mins?' · '+moneyIt(commission.price):'')+'</span><strong>'+(p.commissionTracking&&commission.price>0&&mins?commission.hourly.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €/h':'—')+'</strong><span>tariffa oraria risultante</span></div></div></div>';
       return '<article class="project-preview-card"><div class="project-preview-head"><span class="project-preview-icon">'+(p.archived?'🗄':'▱')+'</span><strong>'+esc(p.name)+'</strong></div><div class="project-preview-meta">'+pt.filter(t=>!t.done).length+' attività aperte · '+(mins?toHours(mins)+' lavorate':'nessuna sessione')+'</div><div class="project-preview-links">'+(links||'<span class="home-chip">nessun link esterno</span>')+'</div>'+commissionBox+'<details class="project-preview-details"><summary>Sessioni collegate ('+linked.length+')</summary>'+(rows||'<div class="home-empty">Nessuna sessione collegata.</div>')+'</details><div class="project-preview-actions">'+fee+'<button class="btn btn-sm" onclick="toggleProjArchive('+i+')">'+(p.archived?'↩ ripristina':'archivia')+'</button></div></article>';
     }
     const active=projects.map((p,i)=>({p,i})).filter(x=>!x.p.archived),archived=projects.map((p,i)=>({p,i})).filter(x=>x.p.archived);elA.className='project-preview-grid';elA.innerHTML=active.length?active.map(x=>card(x.p,x.i)).join(''):'<div class="home-empty">Nessun progetto attivo.</div>';if(archived.length){secArch.style.display='';elArch.className='project-preview-grid';elArch.innerHTML=archived.map(x=>card(x.p,x.i)).join('')}else secArch.style.display='none';
