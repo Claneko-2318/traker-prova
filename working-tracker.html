@@ -817,6 +817,7 @@ tbody tr:last-child td{border-bottom:0}
 <div class="form-fields">
 <div class="field field-date"><label>data</label><input id="inp-date" type="date"/></div>
 <div class="field field-cat"><label>categoria</label><select id="inp-cat"><option value="">— scegli —</option></select></div>
+<div class="field"><label for="inp-task">task (opzionale)</label><select id="inp-task"><option value="">— nessuna task —</option></select></div>
 </div>
 <div class="mode-toggle" style="margin-top:10px;">
 <button class="mode-btn active" id="btn-mode-pom" onclick="setMode('pom')" type="button">🍅 pomodoro</button>
@@ -1746,13 +1747,14 @@ async function saveEdit(){
   }
   const mood=getModalMood();
   const modalProjs=getSelectedProjs('modal-proj-chips');
+  const task=sessions.find(s=>String(s.id)===String(id))?.task||'';
   // prima aggiungiamo la versione nuova: se fallisce, la vecchia resta intatta
-  const add=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs}});
+  const add=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs,task}});
   if(!add||!add.ok){toast('Errore durante la modifica: nessun dato perso.');return;}
   const del=await api({action:'delete',id});
   if(!del||!del.ok){toast('Attenzione: la sessione risulta duplicata, rimuovi la vecchia a mano.');}
   sessions=sessions.filter(s=>s.id.toString()!==id.toString());
-  sessions.push({id:add.id,date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs});
+  sessions.push({id:add.id,date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs,task});
   sessions.sort((a,b)=>a.date.localeCompare(b.date));
   refresh();document.getElementById('modal-overlay').classList.add('hidden');
   toast('Sessione aggiornata!');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
@@ -1937,6 +1939,8 @@ async function addRow(){
   const note=document.getElementById('inp-note').value.trim();
   const mood=getFormMood();
   const sessionProjects=getSelectedProjs('inp-proj-chips');
+  const taskId=document.getElementById('inp-task').value;
+  const task=(window.workTaskApi?.list()||[]).find(t=>String(t.id)===taskId)?.title||'';
   if(!date){toast('Inserisci la data.');return;}
   if(!category){toast('Scegli una categoria.');return;}
   if(!mood){toast('Seleziona il tuo umore!');return;}
@@ -1959,10 +1963,10 @@ async function addRow(){
     if(minutes<1){toast('Inserisci i minuti del Flowmodoro.');return;}
   }
   const btn=document.getElementById('btn-add');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>salvataggio…';
-  const data=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:sessionProjects}});
+  const data=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:sessionProjects,task}});
   btn.disabled=false;btn.textContent='+ aggiungi sessione';
   if(data&&data.ok){
-    sessions.push({id:data.id,date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:sessionProjects});
+    sessions.push({id:data.id,date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:sessionProjects,task});
     sessions.sort((a,b)=>a.date.localeCompare(b.date));
     refresh();
     document.getElementById('inp-pomodori').value='';
@@ -1970,6 +1974,7 @@ async function addRow(){
     document.getElementById('inp-ore').value='';
     document.getElementById('inp-min').value='';
     document.getElementById('inp-flow-min').value='';
+    document.getElementById('inp-task').value='';
     document.getElementById('inp-note').value='';
     document.getElementById('preview').innerHTML='';
     document.getElementById('preview-time').innerHTML='';
@@ -3043,5 +3048,24 @@ if('serviceWorker' in navigator){
 })();
 </script>
 
+<script>
+(function installManualTaskSelector(){
+  const select=document.getElementById('inp-task');
+  function refreshManualTasks(){
+    const previous=select.value,tasks=window.workTaskApi?.list()||[];
+    select.replaceChildren(new Option('— nessuna task —',''));
+    tasks.forEach(task=>{
+      const parent=tasks.find(t=>String(t.id)===String(task.parentId));
+      const label=(parent?parent.title+' → ':'')+task.title+(task.done?' (completata)':'');
+      select.add(new Option(label,String(task.id)));
+    });
+    if([...select.options].some(o=>o.value===previous))select.value=previous;
+  }
+  const refreshTimer=window.refreshTimerTaskOptions;
+  window.refreshTimerTaskOptions=function(){if(refreshTimer)refreshTimer();refreshManualTasks()};
+  select.addEventListener('focus',refreshManualTasks);
+  refreshManualTasks();
+})();
+</script>
 </body>
 </html>
