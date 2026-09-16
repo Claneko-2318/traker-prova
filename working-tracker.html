@@ -981,6 +981,7 @@ tbody tr:last-child td{border-bottom:0}
 <div class="mode-toggle" style="margin-bottom:0;">
 <button class="mode-btn active" id="modal-btn-mode-pom" onclick="setModalMode('pom')" type="button">🍅 pomodoro</button>
 <button class="mode-btn" id="modal-btn-mode-time" onclick="setModalMode('time')" type="button">⏱ ore e minuti</button>
+<button class="mode-btn" id="modal-btn-mode-flow" onclick="setModalMode('flow')" type="button">🌊 flowmodoro</button>
 </div>
 </div>
 <div class="field" id="modal-field-pomodori"><label>pomodori</label><input id="modal-pomodori" max="20" min="1" oninput="updateModalPreview()" type="number"/></div>
@@ -995,6 +996,8 @@ tbody tr:last-child td{border-bottom:0}
 <div class="field" id="modal-field-ore" style="display:none;"><label>ore</label><input id="modal-ore" max="23" min="0" oninput="updateModalPreview()" placeholder="0" type="number"/></div>
 <div class="field" id="modal-field-min" style="display:none;"><label>minuti</label><input id="modal-min" max="59" min="0" oninput="updateModalPreview()" placeholder="0" type="number"/></div>
 <div class="field" style="display:flex;align-items:flex-end;padding-bottom:8px;"><span id="modal-preview" style="font-size:12px;color:var(--text-muted);"></span></div>
+<div class="field" id="modal-field-flow" style="display:none"><label for="modal-flow-min">minuti flowmodoro</label><input id="modal-flow-min" type="number" min="1" step="1" oninput="updateModalPreview()"/></div>
+<div class="field field-full"><label for="modal-task">task (opzionale)</label><select id="modal-task"></select></div>
 <div class="field field-full"><label>note</label><textarea id="modal-note" placeholder="es. ho lavorato alla scena del capitolo 3…"></textarea></div>
 <div class="field field-full">
 <label>progetti collegati</label>
@@ -1676,15 +1679,19 @@ function refresh(){cacheSessions();const f=getFiltered(viewYear,viewMonth);updat
 
 let modalMode='pom';
 function setModalMode(mode){
+  if(mode==='flow'&&modalMode==='time')document.getElementById('modal-flow-min').value=(Number(document.getElementById('modal-ore').value)||0)*60+(Number(document.getElementById('modal-min').value)||0);
+  if(mode==='time'&&modalMode==='flow'){const min=Number(document.getElementById('modal-flow-min').value)||0;document.getElementById('modal-ore').value=Math.floor(min/60);document.getElementById('modal-min').value=min%60}
   modalMode=mode;
   const isPom=mode==='pom';
   document.getElementById('modal-field-pomodori').style.display=isPom?'':'none';
   document.getElementById('modal-field-durata').style.display=isPom?'':'none';
   document.getElementById('modal-field-custom').style.display=(isPom&&document.getElementById('modal-durata').value==='custom')?'':'none';
-  document.getElementById('modal-field-ore').style.display=isPom?'none':'';
-  document.getElementById('modal-field-min').style.display=isPom?'none':'';
+  document.getElementById('modal-field-ore').style.display=mode==='time'?'':'none';
+  document.getElementById('modal-field-min').style.display=mode==='time'?'':'none';
   document.getElementById('modal-btn-mode-pom').classList.toggle('active',isPom);
-  document.getElementById('modal-btn-mode-time').classList.toggle('active',!isPom);
+  document.getElementById('modal-btn-mode-time').classList.toggle('active',mode==='time');
+  document.getElementById('modal-btn-mode-flow').classList.toggle('active',mode==='flow');
+  document.getElementById('modal-field-flow').style.display=mode==='flow'?'':'none';
   updateModalPreview();
 }
 function openModal(id){
@@ -1703,7 +1710,14 @@ function openModal(id){
   const totMin=Number(s.minutes)||0;
   document.getElementById('modal-ore').value=isPomSession?'':Math.floor(totMin/60);
   document.getElementById('modal-min').value=isPomSession?'':totMin%60;
-  setModalMode(isPomSession?'pom':'time');
+  modalMode=isPomSession?'pom':'time';
+  document.getElementById('modal-flow-min').value=totMin;
+  setModalMode(modalMode);
+  const taskSelect=document.getElementById('modal-task'),tasks=window.workTaskApi?.list()||[];
+  taskSelect.replaceChildren(new Option('— nessuna task —',''));
+  tasks.forEach(t=>{const parent=tasks.find(p=>String(p.id)===String(t.parentId));taskSelect.add(new Option((parent?parent.title+' → ':'')+t.title+(t.done?' (completata)':''),t.title))});
+  if(s.task&&![...taskSelect.options].some(o=>o.value===s.task))taskSelect.add(new Option(s.task+' (storico)',s.task));
+  taskSelect.value=s.task||'';
   document.getElementById('modal-note').value=s.note||'';
   document.querySelectorAll('.modal-mood-btn').forEach(b=>b.classList.toggle('selected',b.dataset.mood===s.mood));
   renderProjSelector('modal-proj-chips',s.projects||[]);
@@ -1717,6 +1731,9 @@ function updateModalPreview(){
     document.getElementById('modal-field-custom').style.display=document.getElementById('modal-durata').value==='custom'?'':'none';
     const n=parseInt(document.getElementById('modal-pomodori').value)||0;const d=getModalDurata();const tot=n*d;
     document.getElementById('modal-preview').innerHTML=tot>0?`<strong>${tot} min</strong> (${n} × ${d})`:'';
+  } else if(modalMode==='flow'){
+    const min=Number(document.getElementById('modal-flow-min').value)||0;
+    document.getElementById('modal-preview').textContent=min>0?min+' min → '+toHours(min):'';
   } else {
     const h=parseInt(document.getElementById('modal-ore').value)||0;
     const m=parseInt(document.getElementById('modal-min').value)||0;
@@ -1738,6 +1755,9 @@ async function saveEdit(){
     durata_pomodoro=getModalDurata();
     if(!pomodori||!durata_pomodoro){toast('Inserisci pomodori e durata.');return;}
     minutes=pomodori*durata_pomodoro;
+  } else if(modalMode==='flow'){
+    minutes=Number(document.getElementById('modal-flow-min').value);pomodori='';durata_pomodoro='';
+    if(!Number.isInteger(minutes)||minutes<1){toast('Inserisci minuti interi maggiori di zero.');return;}
   } else {
     const h=parseInt(document.getElementById('modal-ore').value)||0;
     const m=parseInt(document.getElementById('modal-min').value)||0;
@@ -1747,7 +1767,7 @@ async function saveEdit(){
   }
   const mood=getModalMood();
   const modalProjs=getSelectedProjs('modal-proj-chips');
-  const task=sessions.find(s=>String(s.id)===String(id))?.task||'';
+  const task=document.getElementById('modal-task').value;
   // prima aggiungiamo la versione nuova: se fallisce, la vecchia resta intatta
   const add=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs,task}});
   if(!add||!add.ok){toast('Errore durante la modifica: nessun dato perso.');return;}
