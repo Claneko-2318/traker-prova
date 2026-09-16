@@ -1099,8 +1099,8 @@ const trackerSync=(()=>{
   function remoteGroup(response,group){return group==='twitch'?{lives:response.twitchLives,reports:response.twitchReports}:{[group]:response[group]}}
   let fullRead=null;
   function request(params){
-    if((params.action==='get'||params.action==='getSync')&&fullRead)return fullRead;
-    if(params.action==='get'){
+    if(params.action==='getMain'&&fullRead)return fullRead;
+    if(params.action==='getMain'){
       fullRead=requestRaw(params).finally(()=>{fullRead=null});return fullRead;
     }
     return requestRaw(params);
@@ -1108,7 +1108,7 @@ const trackerSync=(()=>{
   async function requestRaw(params){
     if(!SCRIPT_URL)return null;
     const url=SCRIPT_URL;
-    try{const isGet=params.action==='get'||params.action==='getSync',controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),60000);
+    try{const isGet=['get','getMain','getSync'].includes(params.action),controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),60000);
       try{const res=await fetch(isGet?url+'?action='+params.action+'&_ts='+Date.now():url,isGet?{cache:'no-store',signal:controller.signal}:{method:'POST',body:JSON.stringify(params),signal:controller.signal});const data=await res.json();if(url!==SCRIPT_URL)return null;return data;}finally{clearTimeout(timeout)}
     }catch(e){return {ok:false,error:e.name==='AbortError'?'Google non ha risposto entro 60 secondi. Verifica la distribuzione Apps Script e riprova.':'Risposta Google non leggibile o connessione non riuscita. Verifica URL e accesso alla distribuzione.'}}
   }
@@ -1184,9 +1184,12 @@ const trackerSync=(()=>{
     const panel=document.createElement('div');panel.style.cssText='padding:10px 16px;background:#f6eee3;color:#604c3e;border-bottom:1px solid #dfd0bf;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px';
     const detail=document.createElement('span');detail.id='sync-detail';detail.textContent=status;detail.style.flex='1';panel.append(detail);
     for(const [label,fn] of [['Sincronizza',flush],['Verifica conflitti',review],['Scarica copia locale',download]]){const b=document.createElement('button');b.className='btn btn-sm';b.type='button';b.textContent=label;b.onclick=async()=>{b.disabled=true;const original=b.textContent;b.textContent='Attendi…';try{await fn();if(label==='Sincronizza')toast(status)}finally{b.disabled=false;b.textContent=original}};panel.append(b)}
-    document.getElementById('config-panel').append(panel);flush();
-    window.addEventListener('online',flush);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')flush()});
-    setInterval(()=>{if(document.visibilityState==='visible')flush()},30000);
+    document.getElementById('config-panel').append(panel);if(!SCRIPT_URL)flush();
+    let lastAutomatic=Date.now();
+    const auto=()=>{if(document.visibilityState==='visible'&&Date.now()-lastAutomatic>60000){lastAutomatic=Date.now();flush()}};
+    window.addEventListener('online',()=>{lastAutomatic=Date.now();flush()});
+    document.addEventListener('visibilitychange',auto);
+    setInterval(auto,5*60*1000);
   }
   document.addEventListener('DOMContentLoaded',install);
   return {enqueue,flush,request,handles:action=>!!actionGroup[action],pending:()=>Object.values(context()).some(s=>s.pending),export:()=>copy(context())};
@@ -1953,7 +1956,7 @@ function normalizeDate(d){
 async function loadSessions(){
   if(!SCRIPT_URL)return;
   setStatus('Connessione in corso…','wait');
-  const data=await api({action:'get'});
+  const data=await api({action:'getMain'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
     const backendOk=versionAtLeast(data.backendVersion,REQUIRED_BACKEND_VERSION);
@@ -2004,6 +2007,7 @@ async function loadSessions(){
     refresh();
     setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
     document.getElementById('config-panel').classList.add('hidden');
+    trackerSync.flush();
   }else if(data){setStatus('Errore: '+(data.error||'risposta non valida'),'err');}
 }
 
@@ -2616,7 +2620,7 @@ html:before{content:'TRACKER_VERSION_9.4';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.5.2';
+const TRACKER_VERSION='9.5.3';
 const REQUIRED_BACKEND_VERSION='8.5';
 const TRACKER_CACHE_MARK='v9-5-safe-sync';
 function versionAtLeast(current,required){
