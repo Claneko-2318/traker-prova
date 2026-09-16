@@ -2455,32 +2455,59 @@ html:before{content:'TRACKER_VERSION_9.4';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.4';
+const TRACKER_VERSION='9.4.1';
 const REQUIRED_BACKEND_VERSION='8.4';
 const TRACKER_CACHE_MARK='v9-4-twitch-metrics';
 function versionAtLeast(current,required){
   const a=String(current||'0').split('.').map(n=>parseInt(n,10)||0),b=String(required||'0').split('.').map(n=>parseInt(n,10)||0),len=Math.max(a.length,b.length);
   for(let i=0;i<len;i++){const av=a[i]||0,bv=b[i]||0;if(av>bv)return true;if(av<bv)return false}return true;
 }
+let trackerUpdateAccepted=false;
 function installUpdateStatus(){
   const title=document.querySelector('.topbar-title');
   if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
-  const banner=document.createElement('div');banner.id='update-banner';banner.className='update-banner hidden';banner.innerHTML='<span id="update-message">Nuovo aggiornamento disponibile.</span><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button>';document.body.appendChild(banner);
-  const showUpdate=message=>{document.getElementById('update-message').textContent=message||'Nuovo aggiornamento disponibile.';banner.classList.remove('hidden')};
-  document.getElementById('apply-update').onclick=async()=>{const btn=document.getElementById('apply-update');btn.disabled=true;btn.textContent='Aggiornamento…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'})}}if('caches' in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>!k.includes(TRACKER_CACHE_MARK)).map(k=>caches.delete(k)))}location.reload()}catch(e){btn.disabled=false;btn.textContent='Riprova';showUpdate('Aggiornamento non riuscito. Controlla la connessione e riprova.')}};
-  return showUpdate;
+  const dialog=document.createElement('dialog');
+  dialog.id='tracker-update-dialog';
+  dialog.setAttribute('aria-labelledby','tracker-update-title');
+  dialog.style.cssText='max-width:420px;width:calc(100% - 40px);box-sizing:border-box;border:1px solid #cbbba8;border-radius:18px;padding:26px;background:#fffaf2;color:#49372c;box-shadow:0 12px 48px #0003';
+  dialog.innerHTML='<h2 id="tracker-update-title" style="margin-top:0">Aggiornamento disponibile</h2><p id="update-message">È pronta una nuova versione del tracker. Aggiornando, la pagina verrà ricaricata. Completa prima eventuali inserimenti nei moduli.</p><div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn btn-sm" id="defer-update" type="button">Più tardi</button><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button></div>';
+  document.body.appendChild(dialog);
+  const banner=document.createElement('div');banner.className='update-banner hidden';banner.innerHTML='<span>Nuova versione pronta.</span><button class="btn btn-primary btn-sm" type="button">Aggiorna</button>';document.body.appendChild(banner);
+  const show=message=>{if(message)dialog.querySelector('#update-message').textContent=message;if(!dialog.open)dialog.showModal()};
+  banner.querySelector('button').onclick=()=>show();
+  const defer=()=>{dialog.close();banner.classList.remove('hidden')};
+  dialog.querySelector('#defer-update').onclick=defer;
+  dialog.addEventListener('cancel',e=>{e.preventDefault();if(!trackerUpdateAccepted)defer()});
+  dialog.querySelector('#apply-update').onclick=async()=>{
+    const btn=dialog.querySelector('#apply-update'),later=dialog.querySelector('#defer-update');
+    btn.disabled=true;later.disabled=true;btn.textContent='Aggiornamento…';
+    try{
+      const reg=await navigator.serviceWorker.getRegistration();
+      if(!reg||!reg.waiting)throw new Error('Versione non pronta');
+      if(typeof saveTimerState==='function')saveTimerState();
+      trackerUpdateAccepted=true;
+      reg.waiting.postMessage({type:'SKIP_WAITING'});
+      setTimeout(()=>{if(trackerUpdateAccepted){trackerUpdateAccepted=false;btn.disabled=false;later.disabled=false;btn.textContent='Riprova';show('L’aggiornamento non è terminato. Riprova tra poco.')}},15000);
+    }catch(e){trackerUpdateAccepted=false;btn.disabled=false;later.disabled=false;btn.textContent='Riprova';show('Aggiornamento non disponibile. Riprova tra poco o riapri il tracker.');}
+  };
+  return show;
 }
 const showTrackerUpdate=installUpdateStatus();
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
     let reloading=false;
-    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}});
-    navigator.serviceWorker.register("./service-worker.js",{updateViaCache:"none"}).then(reg=>{
-      reg.update();
-      if(reg.waiting)showTrackerUpdate('Versione nuova pronta: premi Aggiorna ora.');
-      reg.addEventListener('updatefound',()=>{const worker=reg.installing;if(!worker)return;worker.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)showTrackerUpdate('Versione nuova pronta: premi Aggiorna ora.')})});
-      setInterval(()=>reg.update(),15*60*1000);
-    }).catch((error) => {console.warn("Registrazione service worker non riuscita:", error);});
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(trackerUpdateAccepted&&!reloading){reloading=true;location.reload()}
+    });
+    navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(reg=>{
+      const watch=worker=>{if(!worker)return;worker.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)showTrackerUpdate()})};
+      if(reg.waiting)showTrackerUpdate();
+      watch(reg.installing);
+      reg.addEventListener('updatefound',()=>watch(reg.installing));
+      const check=()=>reg.update().catch(()=>{});
+      check();setInterval(check,15*60*1000);
+      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check()});
+    }).catch(error=>console.warn('Registrazione service worker non riuscita:',error));
   });
 }
 </script>
