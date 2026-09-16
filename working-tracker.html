@@ -1100,9 +1100,9 @@ const trackerSync=(()=>{
   async function request(params){
     if(!SCRIPT_URL)return null;
     const url=SCRIPT_URL;
-    try{const isGet=params.action==='get',controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
+    try{const isGet=params.action==='get',controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),60000);
       try{const res=await fetch(isGet?url+'?action=get&_ts='+Date.now():url,isGet?{cache:'no-store',signal:controller.signal}:{method:'POST',body:JSON.stringify(params),signal:controller.signal});const data=await res.json();if(url!==SCRIPT_URL)return null;return data;}finally{clearTimeout(timeout)}
-    }catch(e){return null}
+    }catch(e){return {ok:false,error:e.name==='AbortError'?'Google non ha risposto entro 60 secondi. Verifica la distribuzione Apps Script e riprova.':'Risposta Google non leggibile o connessione non riuscita. Verifica URL e accesso alla distribuzione.'}}
   }
   function capture(group,data){
     const st=state(group);st.pending=copy(data);st.seq++;delete st.conflict;persist();notify('Modifiche salvate sul dispositivo · sincronizzazione in attesa');
@@ -1117,7 +1117,7 @@ const trackerSync=(()=>{
     for(let round=0;round<6;round++){
       notify('Sincronizzazione con Google…');
       const response=await request({action:'get'});
-      if(!response?.ok){notify('Connessione non riuscita · le modifiche restano sul dispositivo');return;}
+      if(!response?.ok){notify((response?.error||'Connessione non riuscita')+' · modifiche conservate sul dispositivo');return;}
       if(!response.syncVersions){serverReady=false;notify('Aggiorna e pubblica Apps Script 8.5 · modifiche protette sul dispositivo');return;}
       serverReady=true;
       let retry=false;
@@ -1175,8 +1175,8 @@ const trackerSync=(()=>{
   function install(){
     const panel=document.createElement('div');panel.style.cssText='padding:10px 16px;background:#f6eee3;color:#604c3e;border-bottom:1px solid #dfd0bf;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px';
     const detail=document.createElement('span');detail.id='sync-detail';detail.textContent=status;detail.style.flex='1';panel.append(detail);
-    for(const [label,fn] of [['Sincronizza',flush],['Verifica conflitti',review],['Scarica copia locale',download]]){const b=document.createElement('button');b.className='btn btn-sm';b.type='button';b.textContent=label;b.onclick=fn;panel.append(b)}
-    document.body.prepend(panel);flush();
+    for(const [label,fn] of [['Sincronizza',flush],['Verifica conflitti',review],['Scarica copia locale',download]]){const b=document.createElement('button');b.className='btn btn-sm';b.type='button';b.textContent=label;b.onclick=async()=>{b.disabled=true;const original=b.textContent;b.textContent='Attendi…';try{await fn();if(label==='Sincronizza')toast(status)}finally{b.disabled=false;b.textContent=original}};panel.append(b)}
+    document.getElementById('config-panel').append(panel);flush();
     window.addEventListener('online',flush);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')flush()});
     setInterval(()=>{if(document.visibilityState==='visible')flush()},30000);
   }
@@ -1921,9 +1921,10 @@ async function saveEdit(){
 
 async function api(params){
   if(trackerSync.handles(params.action))return trackerSync.enqueue(params);
-  if(!SCRIPT_URL){toast('Configura prima l\'URL!');return null;}
-  try{const isGet=params.action==='get';const getUrl=SCRIPT_URL+'?action=get&_ts='+Date.now();const res=await fetch(isGet?getUrl:SCRIPT_URL,isGet?{method:'GET',cache:'no-store'}:{method:'POST',body:JSON.stringify(params)});return await res.json();}
-  catch(err){toast('Errore di connessione.');setStatus('Errore di connessione','err');return null;}
+  if(!SCRIPT_URL){toast('Configura prima l’URL di Apps Script.');return null;}
+  const result=await trackerSync.request(params);
+  if(!result?.ok){const message=result?.error||'Collegamento a Google non riuscito';toast(message);setStatus(message,'err');}
+  return result;
 }
 
 function normalizeDate(d){
@@ -2607,7 +2608,7 @@ html:before{content:'TRACKER_VERSION_9.4';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.5';
+const TRACKER_VERSION='9.5.1';
 const REQUIRED_BACKEND_VERSION='8.5';
 const TRACKER_CACHE_MARK='v9-5-safe-sync';
 function versionAtLeast(current,required){
