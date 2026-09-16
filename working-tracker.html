@@ -2412,8 +2412,6 @@ else{setStatus('Configura la connessione (⚙️)','wait');}
 html:before{content:'TRACKER_VERSION_9.4';display:none}
 #home-new-task-inline{display:none!important}
 .app-version-badge{display:inline-flex;align-items:center;margin-left:9px;padding:3px 7px;border:1px solid rgba(255,255,255,.28);border-radius:999px;color:#fff4e7;background:rgba(49,29,18,.28);font:600 9px/1 'DM Sans',sans-serif;letter-spacing:.06em;vertical-align:middle}
-.update-banner{position:fixed;left:50%;bottom:24px;z-index:220;display:flex;align-items:center;gap:10px;width:min(520px,calc(100vw - 28px));padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:0 18px 45px rgba(42,24,15,.22);transform:translateX(-50%)}
-.update-banner.hidden{display:none}.update-banner span{flex:1;color:var(--espresso);font-size:12px}.update-banner .btn{white-space:nowrap}
 .task-parent-fields{grid-column:1/-1}
 .task-tree-group{margin:6px 0;border:1px solid transparent;border-radius:14px;transition:.18s ease}
 .task-tree-group:has(>.task-children:not(:empty)){border-color:var(--line);background:rgba(246,237,227,.42)}
@@ -2446,7 +2444,6 @@ html:before{content:'TRACKER_VERSION_9.4';display:none}
   .project-create-bar{align-items:stretch;flex-direction:column}
   .project-create-bar .btn{width:100%}
   .task-children{margin-left:20px;padding-left:10px}
-  .update-banner{bottom:86px}
 }
 @media(max-width:560px){
   .home-task{grid-template-columns:24px 22px minmax(0,1fr) 54px 28px!important}
@@ -2627,59 +2624,21 @@ function versionAtLeast(current,required){
   const a=String(current||'0').split('.').map(n=>parseInt(n,10)||0),b=String(required||'0').split('.').map(n=>parseInt(n,10)||0),len=Math.max(a.length,b.length);
   for(let i=0;i<len;i++){const av=a[i]||0,bv=b[i]||0;if(av>bv)return true;if(av<bv)return false}return true;
 }
-let trackerUpdateAccepted=false;
-function installUpdateStatus(){
+function installVersionStatus(){
   const title=document.querySelector('.topbar-title');
   if(title&&!document.getElementById('app-version-badge'))title.insertAdjacentHTML('beforeend','<span class="app-version-badge" id="app-version-badge">v'+TRACKER_VERSION+'</span>');
-  const dialog=document.createElement('dialog');
-  dialog.id='tracker-update-dialog';
-  dialog.setAttribute('aria-labelledby','tracker-update-title');
-  dialog.style.cssText='max-width:420px;width:calc(100% - 40px);box-sizing:border-box;border:1px solid #cbbba8;border-radius:18px;padding:26px;background:#fffaf2;color:#49372c;box-shadow:0 12px 48px #0003';
-  dialog.innerHTML='<h2 id="tracker-update-title" style="margin-top:0">Aggiornamento disponibile</h2><p id="update-message">È pronta una nuova versione del tracker. Aggiornando, la pagina verrà ricaricata. Completa prima eventuali inserimenti nei moduli.</p><div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn btn-sm" id="defer-update" type="button">Più tardi</button><button class="btn btn-primary btn-sm" id="apply-update" type="button">Aggiorna ora</button></div>';
-  document.body.appendChild(dialog);
-  const banner=document.createElement('div');banner.className='update-banner hidden';banner.innerHTML='<span>Nuova versione pronta.</span><button class="btn btn-primary btn-sm" type="button">Aggiorna</button>';document.body.appendChild(banner);
-  const show=message=>{if(message)dialog.querySelector('#update-message').textContent=message;if(!dialog.open)dialog.showModal()};
-  banner.querySelector('button').onclick=()=>show();
-  const defer=()=>{dialog.close();banner.classList.remove('hidden')};
-  dialog.querySelector('#defer-update').onclick=defer;
-  dialog.addEventListener('cancel',e=>{e.preventDefault();if(!trackerUpdateAccepted)defer()});
-  dialog.querySelector('#apply-update').onclick=async()=>{
-    const btn=dialog.querySelector('#apply-update'),later=dialog.querySelector('#defer-update');
-    btn.disabled=true;later.disabled=true;btn.textContent='Aggiornamento…';
-    try{
-      const reg=await navigator.serviceWorker.getRegistration();
-      if(!reg||!reg.waiting)throw new Error('Versione non pronta');
-      if(typeof saveTimerState==='function')saveTimerState();
-      trackerUpdateAccepted=true;
-      reg.waiting.postMessage({type:'SKIP_WAITING'});
-      setTimeout(()=>{if(trackerUpdateAccepted){trackerUpdateAccepted=false;btn.disabled=false;later.disabled=false;btn.textContent='Riprova';show('L’aggiornamento non è terminato. Riprova tra poco.')}},15000);
-    }catch(e){trackerUpdateAccepted=false;btn.disabled=false;later.disabled=false;btn.textContent='Riprova';show('Aggiornamento non disponibile. Riprova tra poco o riapri il tracker.');}
-  };
-  return show;
 }
-const showTrackerUpdate=installUpdateStatus();
+installVersionStatus();
+
+// Il service worker continua a controllare gli aggiornamenti in modo silenzioso.
+// Nessun popup, banner o ricaricamento forzato: la nuova versione verrà
+// applicata normalmente dopo la chiusura/riapertura del tracker.
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    let reloading=false;
-    navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      if(trackerUpdateAccepted&&!reloading){reloading=true;location.reload()}
-    });
     navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(reg=>{
-      const watch=worker=>{if(!worker)return;worker.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)showTrackerUpdate()})};
-      if(reg.waiting)showTrackerUpdate();
-      watch(reg.installing);
-      reg.addEventListener('updatefound',()=>watch(reg.installing));
       const check=()=>reg.update().catch(()=>{});
-      const checkButton=document.createElement('button');
-      checkButton.type='button';checkButton.className='btn btn-sm';checkButton.textContent='Controlla aggiornamenti';
-      document.getElementById('app-version-badge')?.after(checkButton);
-      checkButton.onclick=async()=>{
-        checkButton.disabled=true;
-        try{await reg.update();if(reg.waiting)showTrackerUpdate();else toast(reg.installing?'Aggiornamento in download: attendi il pop-up.':'Nessun aggiornamento disponibile al momento. Versione '+TRACKER_VERSION+'.')}
-        catch(e){toast('Controllo non riuscito. Verifica la connessione.')}
-        finally{checkButton.disabled=false}
-      };
-      check();setInterval(check,15*60*1000);
+      check();
+      setInterval(check,15*60*1000);
       document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check()});
     }).catch(error=>console.warn('Registrazione service worker non riuscita:',error));
   });
