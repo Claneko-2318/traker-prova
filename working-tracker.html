@@ -760,12 +760,12 @@ tbody tr:last-child td{border-bottom:0}
 <div class="main-box">
 <!-- PAGINA 1: Inserimento -->
 <div class="page-section active" id="page-insert">
-<div class="section-label" style="margin-top:0;">timer pomodoro</div>
+<div class="section-label" style="margin-top:0;">timer focus</div>
 <div class="card" id="timer-card" style="margin-bottom:1.5rem;">
 <div id="timer-setup" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
 <div class="timer-kind-toggle" style="flex:1 1 100%;display:flex;gap:7px;">
 <button class="mode-btn active" id="timer-kind-pom" onclick="setTimerInputMode('pomodoro')" type="button">🍅 Pomodoro</button>
-<button class="mode-btn" id="timer-kind-stopwatch" onclick="setTimerInputMode('stopwatch')" type="button">⏱ Cronometro</button>
+<button class="mode-btn" id="timer-kind-flow" onclick="setTimerInputMode('flowmodoro')" type="button">🌊 Flowmodoro</button>
 </div>
 <div class="field" style="flex:1;min-width:150px;"><label>task / categoria</label>
 <select id="timer-cat"><option value="">— scegli —</option></select>
@@ -805,6 +805,7 @@ tbody tr:last-child td{border-bottom:0}
 <div id="timer-tomatoes" style="font-size:19px;min-height:26px;letter-spacing:2px;"></div>
 <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
 <button class="btn" id="timer-btn-pause" onclick="pauseResumeTimer()">⏸ pausa</button>
+<button class="btn" id="timer-btn-flow-break" onclick="startFlowBreak()" style="display:none;">☕ inizia pausa</button>
 <button class="btn" id="timer-btn-skip" onclick="skipBreak()" style="display:none;">⏭ salta pausa</button>
 <button class="btn btn-primary" onclick="finishTimer()">■ termina sessione</button>
 <button class="btn btn-danger" onclick="cancelTimer()">✕ annulla</button>
@@ -1624,7 +1625,7 @@ function renderCategoryBreakdown(filtered){
     </div>`;
   }).join('');
 }
-// --- timer pomodoro ---
+// --- timer Pomodoro / Flowmodoro ---
 const TIMER_KEY='focus_timer_state';
 const BASE_TITLE=document.title;
 let timer=null;
@@ -1634,9 +1635,9 @@ function timerPausaVal(){const v=document.getElementById('timer-pausa').value;re
 function timerPausaLungaVal(){const v=document.getElementById('timer-pausa-lunga').value;return v==='custom'?(parseInt(document.getElementById('timer-pausa-lunga-custom').value)||0):parseInt(v);}
 let timerInputMode='pomodoro';
 function setTimerInputMode(mode){
-  timerInputMode=mode==='stopwatch'?'stopwatch':'pomodoro';
+  timerInputMode=mode==='flowmodoro'?'flowmodoro':'pomodoro';
   document.getElementById('timer-kind-pom').classList.toggle('active',timerInputMode==='pomodoro');
-  document.getElementById('timer-kind-stopwatch').classList.toggle('active',timerInputMode==='stopwatch');
+  document.getElementById('timer-kind-flow').classList.toggle('active',timerInputMode==='flowmodoro');
   ['timer-durata','timer-pausa','timer-pausa-lunga','timer-pausa-lunga-ogni'].forEach(id=>{const field=document.getElementById(id)?.closest('.field');if(field)field.style.display=timerInputMode==='pomodoro'?'':'none'});
   ['timer-field-durata-custom','timer-field-pausa-custom','timer-field-pausa-lunga-custom'].forEach(id=>{const field=document.getElementById(id);if(field)field.style.display='none'});
 }
@@ -1645,8 +1646,8 @@ function startTimer(){
   if(!cat){toast('Scegli prima la categoria!');return;}
   const taskSel=document.getElementById('timer-task');
   if(taskSel&&!taskSel.value){toast('Scegli una task collegata oppure “nessuna task”.');return;}
-  if(timerInputMode==='stopwatch'){
-    timer={kind:'stopwatch',phase:'work',startedAt:Date.now(),accumulatedMs:0,paused:false,category:cat,taskId:taskSel&&taskSel.value!=='__none__'?taskSel.value:''};
+  if(timerInputMode==='flowmodoro'){
+    timer={kind:'flowmodoro',phase:'work',startedAt:Date.now(),accumulatedMs:0,totalWorkMs:0,lastWorkMs:0,breakDurationMs:0,breakEndsAt:null,paused:false,pausedRemaining:null,category:cat,taskId:taskSel&&taskSel.value!=='__none__'?taskSel.value:''};
     saveTimerState();renderTimer();startTick();return;
   }
   const w=timerDurataVal();if(!w||w<1){toast('Durata pomodoro non valida.');return;}
@@ -1658,15 +1659,39 @@ function startTimer(){
 }
 function startTick(){stopTick();window._timerInt=setInterval(tickTimer,500);}
 function stopTick(){if(window._timerInt){clearInterval(window._timerInt);window._timerInt=null;}}
+function flowCurrentWorkMs(){
+  if(!timer||timer.kind!=='flowmodoro'||timer.phase!=='work')return 0;
+  return Math.max(0,Number(timer.accumulatedMs||0)+(timer.paused?0:Date.now()-Number(timer.startedAt||Date.now())));
+}
+function flowTotalWorkMs(includeCurrent=true){
+  if(!timer||timer.kind!=='flowmodoro')return 0;
+  return Math.max(0,Number(timer.totalWorkMs||0)+(includeCurrent?flowCurrentWorkMs():0));
+}
+function flowBreakDurationMs(workMs){
+  // Flowmodoro: circa 5 minuti di pausa ogni 25 minuti di focus (1/5 del blocco), arrotondati al minuto.
+  const mins=Math.max(1,Math.round((Math.max(0,workMs)/60000)/5));
+  return mins*60000;
+}
 function tickTimer(){
   if(!timer)return;
-  if(timer.kind==='stopwatch'){if(!timer.paused)renderTimerCountdown();return;}
+  if(timer.kind==='flowmodoro'){
+    advanceFlowPhase(true);
+    renderTimerCountdown();
+    return;
+  }
   if(timer.pausedRemaining!=null)return;
   advancePhases(true);
   renderTimerCountdown();
 }
+function advanceFlowPhase(notify){
+  if(!timer||timer.kind!=='flowmodoro'||timer.phase!=='break'||timer.pausedRemaining!=null||!timer.breakEndsAt)return;
+  if(Date.now()<timer.breakEndsAt)return;
+  timer.phase='ready';timer.breakEndsAt=null;timer.pausedRemaining=null;
+  saveTimerState();renderTimer();
+  if(notify)notifyPhase('☕ Pausa finita!','Riprendi il Flowmodoro quando sei pronta.');
+}
 function advancePhases(notify){
-  if(timer&&timer.kind==='stopwatch'){renderTimer();return;}
+  if(timer&&timer.kind==='flowmodoro'){advanceFlowPhase(notify);return;}
   let guard=0;
   while(timer&&timer.pausedRemaining==null&&Date.now()>=timer.endsAt&&guard<1000){
     guard++;
@@ -1701,9 +1726,15 @@ function notifyPhase(title,body){
 function pauseResumeTimer(){
   if(!timer)return;
   const btn=document.getElementById('timer-btn-pause');
-  if(timer.kind==='stopwatch'){
-    if(timer.paused){timer.startedAt=Date.now();timer.paused=false;btn.innerHTML='⏸ pausa';}
-    else{timer.accumulatedMs+=(Date.now()-timer.startedAt);timer.paused=true;btn.innerHTML='▶ riprendi';}
+  if(timer.kind==='flowmodoro'){
+    if(timer.phase==='ready')return;
+    if(timer.phase==='work'){
+      if(timer.paused){timer.startedAt=Date.now();timer.paused=false;btn.innerHTML='⏸ pausa';}
+      else{timer.accumulatedMs=flowCurrentWorkMs();timer.paused=true;btn.innerHTML='▶ riprendi';}
+    }else if(timer.phase==='break'){
+      if(timer.pausedRemaining!=null){timer.breakEndsAt=Date.now()+timer.pausedRemaining;timer.pausedRemaining=null;btn.innerHTML='⏸ pausa';}
+      else{timer.pausedRemaining=Math.max(0,Number(timer.breakEndsAt||Date.now())-Date.now());timer.breakEndsAt=null;btn.innerHTML='▶ riprendi';}
+    }
     saveTimerState();renderTimerCountdown();return;
   }
   if(timer.pausedRemaining!=null){
@@ -1715,22 +1746,43 @@ function pauseResumeTimer(){
   }
   saveTimerState();renderTimerCountdown();
 }
+function startFlowBreak(){
+  if(!timer||timer.kind!=='flowmodoro'||timer.phase!=='work')return;
+  const workMs=flowCurrentWorkMs();
+  if(workMs<60000){toast('Il Flowmodoro non ha ancora registrato un minuto intero.');return;}
+  timer.totalWorkMs=Number(timer.totalWorkMs||0)+workMs;
+  timer.lastWorkMs=workMs;
+  timer.breakDurationMs=flowBreakDurationMs(workMs);
+  timer.phase='break';timer.breakEndsAt=Date.now()+timer.breakDurationMs;timer.startedAt=null;timer.accumulatedMs=0;timer.paused=false;timer.pausedRemaining=null;
+  saveTimerState();renderTimer();
+  toast('Pausa Flowmodoro: '+Math.round(timer.breakDurationMs/60000)+' min dopo '+toHours(Math.max(1,Math.floor(workMs/60000)))+' di focus.');
+}
+function resumeFlowWork(){
+  if(!timer||timer.kind!=='flowmodoro')return;
+  timer.phase='work';timer.startedAt=Date.now();timer.accumulatedMs=0;timer.paused=false;timer.pausedRemaining=null;timer.breakEndsAt=null;timer.breakDurationMs=0;
+  saveTimerState();renderTimer();
+}
 function skipBreak(){
-  if(!timer||(timer.phase!=='break'&&timer.phase!=='long-break'))return;
+  if(!timer)return;
+  if(timer.kind==='flowmodoro'){
+    if(timer.phase==='break'||timer.phase==='ready'){resumeFlowWork();return;}
+    return;
+  }
+  if(timer.phase!=='break'&&timer.phase!=='long-break')return;
   timer.phase='work';timer.pausedRemaining=null;timer.endsAt=Date.now()+timer.workMin*60000;
   document.getElementById('timer-btn-pause').innerHTML='⏸ pausa';
   saveTimerState();renderTimer();
 }
 function timerExtraMin(){
-  if(!timer||timer.phase!=='work')return 0;
+  if(!timer||timer.kind!=='pomodoro'||timer.phase!=='work')return 0;
   const rem=timer.pausedRemaining!=null?timer.pausedRemaining:Math.max(0,timer.endsAt-Date.now());
   return Math.floor((timer.workMin*60000-rem)/60000);
 }
 function finishTimer(){
   if(!timer)return;
-  if(timer.kind==='stopwatch'){
-    const elapsed=timer.accumulatedMs+(timer.paused?0:Date.now()-timer.startedAt),tot=Math.floor(elapsed/60000);
-    if(tot<1){toast('Il cronometro non ha ancora registrato un minuto intero.');return;}
+  if(timer.kind==='flowmodoro'){
+    const tot=Math.floor(flowTotalWorkMs(timer.phase==='work')/60000);
+    if(tot<1){toast('Il Flowmodoro non ha ancora registrato un minuto intero.');return;}
     openTimerModal(0,0,tot,tot,timer.category);return;
   }
   advancePhases(false);
@@ -1741,7 +1793,7 @@ function finishTimer(){
 }
 function cancelTimer(){
   if(!timer)return;
-  const tot=timer.kind==='stopwatch'?Math.floor((timer.accumulatedMs+(timer.paused?0:Date.now()-timer.startedAt))/60000):timer.completed*timer.workMin+timerExtraMin();
+  const tot=timer.kind==='flowmodoro'?Math.floor(flowTotalWorkMs(timer.phase==='work')/60000):timer.completed*timer.workMin+timerExtraMin();
   if(tot>=1&&!confirm('Annullare il timer? '+toHours(tot)+' di lavoro NON verranno salvati.'))return;
   resetTimer();toast('Timer annullato.');
 }
@@ -1751,24 +1803,60 @@ function resetTimer(){
   document.getElementById('timer-setup').style.display='flex';
   document.getElementById('timer-running').style.display='none';
   document.getElementById('timer-btn-pause').innerHTML='⏸ pausa';
+  document.getElementById('timer-btn-pause').style.display='';
+  document.getElementById('timer-btn-flow-break').style.display='none';
+  document.getElementById('timer-btn-skip').style.display='none';
 }
 function renderTimer(){
   if(!timer)return;
   document.getElementById('timer-setup').style.display='none';
   document.getElementById('timer-running').style.display='';
-  const lbl=timer.kind==='stopwatch'?'cronometro · '+timer.category:timer.phase==='work'?('pomodoro '+(timer.completed+1)+' · '+timer.category):(timer.phase==='long-break'?'pausa lunga ☕ · ':'pausa ☕ · ')+timer.category;
+  let lbl='';
+  if(timer.kind==='flowmodoro'){
+    if(timer.phase==='work')lbl='flowmodoro · '+timer.category;
+    else if(timer.phase==='break')lbl='pausa flowmodoro ☕ · '+timer.category;
+    else lbl='pausa conclusa · '+timer.category;
+  }else lbl=timer.phase==='work'?('pomodoro '+(timer.completed+1)+' · '+timer.category):(timer.phase==='long-break'?'pausa lunga ☕ · ':'pausa ☕ · ')+timer.category;
   document.getElementById('timer-phase-label').textContent=lbl;
-  document.getElementById('timer-tomatoes').textContent=timer.kind==='stopwatch'?'⏱':'🍅'.repeat(Math.min(timer.completed,30));
-  document.getElementById('timer-btn-skip').style.display=timer.kind!=='stopwatch'&&(timer.phase==='break'||timer.phase==='long-break')?'':'none';
-  document.getElementById('timer-btn-pause').innerHTML=timer.kind==='stopwatch'?(timer.paused?'▶ riprendi':'⏸ pausa'):(timer.pausedRemaining!=null?'▶ riprendi':'⏸ pausa');
+  if(timer.kind==='flowmodoro'){
+    const totalMin=Math.floor(flowTotalWorkMs(timer.phase==='work')/60000);
+    if(timer.phase==='break')document.getElementById('timer-tomatoes').textContent='🌊 '+toHours(Math.max(1,Math.floor(Number(timer.lastWorkMs||0)/60000)))+' focus · ☕ '+Math.max(1,Math.round(Number(timer.breakDurationMs||0)/60000))+' min';
+    else document.getElementById('timer-tomatoes').textContent='🌊 focus totale: '+toHours(totalMin);
+  }else document.getElementById('timer-tomatoes').textContent='🍅'.repeat(Math.min(timer.completed,30));
+  const flowBreakBtn=document.getElementById('timer-btn-flow-break');
+  flowBreakBtn.style.display=timer.kind==='flowmodoro'&&timer.phase==='work'?'':'none';
+  const skip=document.getElementById('timer-btn-skip');
+  if(timer.kind==='flowmodoro'){
+    skip.style.display=(timer.phase==='break'||timer.phase==='ready')?'':'none';
+    skip.innerHTML=timer.phase==='ready'?'▶ riprendi lavoro':'⏭ termina pausa';
+  }else{
+    skip.style.display=(timer.phase==='break'||timer.phase==='long-break')?'':'none';
+    skip.innerHTML='⏭ salta pausa';
+  }
+  const pause=document.getElementById('timer-btn-pause');
+  pause.style.display=timer.kind==='flowmodoro'&&timer.phase==='ready'?'none':'';
+  if(timer.kind==='flowmodoro')pause.innerHTML=(timer.phase==='work'&&timer.paused)||(timer.phase==='break'&&timer.pausedRemaining!=null)?'▶ riprendi':'⏸ pausa';
+  else pause.innerHTML=timer.pausedRemaining!=null?'▶ riprendi':'⏸ pausa';
   renderTimerCountdown();
 }
 function renderTimerCountdown(){
   if(!timer)return;
-  if(timer.kind==='stopwatch'){
-    const elapsed=timer.accumulatedMs+(timer.paused?0:Date.now()-timer.startedAt),totSec=Math.floor(elapsed/1000),hh=Math.floor(totSec/3600),mm=Math.floor((totSec%3600)/60),ss=totSec%60;
-    document.getElementById('timer-display').textContent=(hh?String(hh).padStart(2,'0')+':':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
-    document.title=(hh?String(hh).padStart(2,'0')+':':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0')+' ⏱ — '+BASE_TITLE;return;
+  if(timer.kind==='flowmodoro'){
+    if(timer.phase==='work'){
+      const elapsed=flowCurrentWorkMs(),totSec=Math.floor(elapsed/1000),hh=Math.floor(totSec/3600),mm=Math.floor((totSec%3600)/60),ss=totSec%60;
+      const shown=(hh?String(hh).padStart(2,'0')+':':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+      document.getElementById('timer-display').textContent=shown;
+      document.title=shown+' 🌊 — '+BASE_TITLE;
+    }else if(timer.phase==='break'){
+      const rem=timer.pausedRemaining!=null?timer.pausedRemaining:Math.max(0,Number(timer.breakEndsAt||Date.now())-Date.now());
+      const totSec=Math.ceil(rem/1000),mm=String(Math.floor(totSec/60)).padStart(2,'0'),ss=String(totSec%60).padStart(2,'0');
+      document.getElementById('timer-display').textContent=mm+':'+ss;
+      document.title=mm+':'+ss+' ☕ — '+BASE_TITLE;
+    }else{
+      document.getElementById('timer-display').textContent='00:00';
+      document.title='Flowmodoro pronto 🌊 — '+BASE_TITLE;
+    }
+    return;
   }
   const rem=timer.pausedRemaining!=null?timer.pausedRemaining:Math.max(0,timer.endsAt-Date.now());
   const totSec=Math.ceil(rem/1000);
@@ -1821,7 +1909,10 @@ async function saveTimerSession(){
   window.addEventListener('load',function(){
     try{
       const s=JSON.parse(localStorage.getItem(TIMER_KEY)||'null');
-      if(s&&(s.endsAt||(s.kind==='stopwatch'&&s.startedAt))){timer=s;advancePhases(false);if(timer){renderTimer();startTick();}}
+      // I vecchi stati del cronometro non vengono riattivati dopo il passaggio a Flowmodoro.
+      if(s&&s.kind==='stopwatch'){localStorage.removeItem(TIMER_KEY);return;}
+      const restorable=s&&(s.endsAt||(s.kind==='flowmodoro'&&(s.startedAt||s.phase==='break'||s.phase==='ready')));
+      if(restorable){timer=s;advancePhases(false);if(timer){renderTimer();startTick();}}
     }catch(e){}
   });
 })();
