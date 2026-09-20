@@ -1106,12 +1106,39 @@ const trackerSync=(()=>{
     }
     return requestRaw(params);
   }
+  const connectionMeasures=[];
+  function showMeasures(){
+    const el=document.getElementById('connection-measures');
+    if(el)el.textContent=connectionMeasures.map(m=>m.label+': '+m.seconds+' s · '+m.outcome+(m.timings?' · elaborazione Google '+(m.timings.totalMs/1000).toFixed(1)+' s'+(m.timings.lockWaitMs!==undefined?' · attesa sincronizzazione '+(m.timings.lockWaitMs/1000).toFixed(1)+' s':''):'')).join('\n');
+  }
   async function requestRaw(params){
     if(!SCRIPT_URL)return null;
-    const url=SCRIPT_URL;
-    try{const isGet=['get','getMain','getSync'].includes(params.action),controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),60000);
-      try{const res=await fetch(isGet?url+'?action='+params.action+'&_ts='+Date.now():url,isGet?{cache:'no-store',signal:controller.signal}:{method:'POST',body:JSON.stringify(params),signal:controller.signal});const data=await res.json();if(url!==SCRIPT_URL)return null;return data;}finally{clearTimeout(timeout)}
-    }catch(e){return {ok:false,error:e.name==='AbortError'?'Google non ha risposto entro 60 secondi. Verifica la distribuzione Apps Script e riprova.':'Risposta Google non leggibile o connessione non riuscita. Verifica URL e accesso alla distribuzione.'}}
+    const url=SCRIPT_URL,started=performance.now();
+    const label=params.action==='getMain'?'Caricamento sessioni':params.action==='getSync'?'Sincronizzazione task, note e Twitch':'Salvataggio '+params.action;
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),60000);
+    const slow=setTimeout(()=>{const el=document.getElementById('connection-measures');if(el)el.textContent=label+': Google sta impiegando più di 10 secondi. I dati locali restano disponibili.';},10000);
+    let data;
+    try{
+      const isGet=['get','getMain','getSync'].includes(params.action);
+      const endpoint=new URL(url);
+      if(isGet){endpoint.searchParams.set('action',params.action);endpoint.searchParams.set('_ts',Date.now());}
+      const res=await fetch(isGet?endpoint.href:url,isGet?{cache:'no-store',signal:controller.signal}:{method:'POST',body:JSON.stringify(params),signal:controller.signal});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      data=await res.json();
+      if(url!==SCRIPT_URL)return null;
+      return data;
+    }catch(e){
+      data={ok:false,error:e.name==='AbortError'?'Google non ha risposto entro 60 secondi. Riprova: i dati locali sono conservati.':'Risposta Google non leggibile o connessione non riuscita. Verifica URL e accesso alla distribuzione.'};
+      return data;
+    }finally{
+      clearTimeout(timeout);clearTimeout(slow);
+      if(url===SCRIPT_URL){
+        connectionMeasures.push({label,seconds:((performance.now()-started)/1000).toFixed(1),outcome:data?.ok?'completato':'non completato',timings:data?.timings});
+        if(connectionMeasures.length>8)connectionMeasures.shift();
+        showMeasures();
+      }
+    }
   }
   function capture(group,data){
     const st=state(group);st.pending=copy(data);st.seq++;delete st.conflict;persist();notify('Modifiche salvate sul dispositivo · sincronizzazione in attesa');
@@ -1185,7 +1212,8 @@ const trackerSync=(()=>{
     const panel=document.createElement('div');panel.style.cssText='padding:10px 16px;background:#f6eee3;color:#604c3e;border-bottom:1px solid #dfd0bf;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px';
     const detail=document.createElement('span');detail.id='sync-detail';detail.textContent=status;detail.style.flex='1';panel.append(detail);
     for(const [label,fn] of [['Sincronizza',flush],['Verifica conflitti',review],['Scarica copia locale',download]]){const b=document.createElement('button');b.className='btn btn-sm';b.type='button';b.textContent=label;b.onclick=async()=>{b.disabled=true;const original=b.textContent;b.textContent='Attendi…';try{await fn();if(label==='Sincronizza')toast(status)}finally{b.disabled=false;b.textContent=original}};panel.append(b)}
-    document.getElementById('config-panel').append(panel);if(!SCRIPT_URL)flush();
+    document.getElementById('config-panel').append(panel);
+    const measures=document.createElement('div');measures.id='connection-measures';measures.style.cssText='white-space:pre-wrap;padding:10px 16px;font-size:12px;color:#604c3e';measures.textContent='Tempi di collegamento disponibili dopo la prima richiesta.';document.getElementById('config-panel').append(measures);showMeasures();if(!SCRIPT_URL)flush();
     let lastAutomatic=Date.now();
     const auto=()=>{if(document.visibilityState==='visible'&&Date.now()-lastAutomatic>60000){lastAutomatic=Date.now();flush()}};
     window.addEventListener('online',()=>{lastAutomatic=Date.now();flush()});
@@ -1212,7 +1240,7 @@ function setStatus(msg,type){
   const dot=document.getElementById('status-dot');
   const txt=document.getElementById('status-text');
   dot.className='status-dot-circle '+(type==='ok'?'ok':type==='err'?'err':'');
-  txt.textContent=type==='ok'?'Connesso':type==='err'?'Non connesso':'Connessione in corso…';
+  txt.textContent=type==='ok'?'Sessioni collegate':type==='err'?'Non connesso':msg;
 }
 function showPage(name){
   document.querySelectorAll('.page-section').forEach(p=>p.classList.remove('active'));
@@ -2051,7 +2079,7 @@ function normalizeDate(d){
 }
 async function loadSessions(){
   if(!SCRIPT_URL)return;
-  setStatus('Connessione in corso…','wait');
+  setStatus('Caricamento sessioni da Google…','wait');
   const data=await api({action:'getMain'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
@@ -2736,7 +2764,7 @@ html:before{content:'TRACKER_VERSION_9.6';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.6.0';
+const TRACKER_VERSION='9.6.1';
 const REQUIRED_BACKEND_VERSION='8.6';
 const TRACKER_CACHE_MARK='v9-5-safe-sync';
 function versionAtLeast(current,required){
