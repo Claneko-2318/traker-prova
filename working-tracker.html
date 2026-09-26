@@ -1223,6 +1223,19 @@ const trackerSync=(()=>{
   document.addEventListener('DOMContentLoaded',install);
   return {enqueue,flush,request,handles:action=>!!actionGroup[action],pending:()=>Object.values(context()).some(s=>s.pending),export:()=>copy(context())};
 })();
+let sessionBackendReady=false;
+function sessionDraftId(session){
+  const fingerprint=JSON.stringify(session);
+  const key='focus_pending_session_add_v1';
+  let pending;try{pending=JSON.parse(localStorage.getItem(key)||'null')}catch(e){}
+  if(pending&&pending.fingerprint===fingerprint)return pending.id;
+  const id=globalThis.crypto?.randomUUID?.()||'session-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+  localStorage.setItem(key,JSON.stringify({fingerprint,id}));return id;
+}
+function clearSessionDraft(id){
+  const key='focus_pending_session_add_v1';
+  try{if(JSON.parse(localStorage.getItem(key)||'null')?.id===id)localStorage.removeItem(key)}catch(e){}
+}
 let sessions=[],moods={},chart=null;
 let selectedCatColor='#EAD9C0';
 let SCRIPT_URL=localStorage.getItem('focus_script_url')||'';
@@ -1926,7 +1939,7 @@ async function saveTimerSession(){
   const session={date,category,minutes:p.tot,pomodori:p.completed>0?p.completed:'',durata_pomodoro:p.completed>0?p.workMin:'',note,mood,projects:projs,task:p.task||'',taskId:p.taskId||''};
   const add=await api({action:'add',session});
   if(add&&add.ok){
-    sessions.push(Object.assign({id:add.id},session));
+    if(!sessions.some(s=>String(s.id)===String(add.id)))sessions.push(Object.assign({id:add.id},session));
     sessions.sort((a,b)=>a.date.localeCompare(b.date));
     refresh();closeTModal();resetTimer();
     toast('Sessione salvata: '+toHours(p.tot)+'! 🎉');
@@ -2042,13 +2055,10 @@ async function saveEdit(){
   let task='',taskId='';
   if(taskValue==='__history__'){task=taskSelect.dataset.historyTask||'';taskId=taskSelect.dataset.historyTaskId||'';}
   else if(taskValue){const linked=(window.workTaskApi?.list()||[]).find(t=>String(t.id)===String(taskValue));if(linked){task=linked.title||'';taskId=String(linked.id)}}
-  // prima aggiungiamo la versione nuova: se fallisce, la vecchia resta intatta
-  const add=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs,task,taskId}});
-  if(!add||!add.ok){toast('Errore durante la modifica: nessun dato perso.');return;}
-  const del=await api({action:'delete',id});
-  if(!del||!del.ok){toast('Attenzione: la sessione risulta duplicata, rimuovi la vecchia a mano.');}
-  sessions=sessions.filter(s=>s.id.toString()!==id.toString());
-  sessions.push({id:add.id,date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs,task,taskId});
+  const saved=await api({action:'update',id,session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs,task,taskId}});
+  if(!saved||!saved.ok){toast('Modifica non confermata: ricarica le sessioni prima di riprovare.');return;}
+  sessions=sessions.filter(s=>String(s.id)!==String(id));
+  sessions.push({id,date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:modalProjs,task,taskId});
   sessions.sort((a,b)=>a.date.localeCompare(b.date));
   refresh();document.getElementById('modal-overlay').classList.add('hidden');
   toast('Sessione aggiornata!');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
@@ -2057,7 +2067,10 @@ async function saveEdit(){
 async function api(params){
   if(trackerSync.handles(params.action))return trackerSync.enqueue(params);
   if(!SCRIPT_URL){toast('Configura prima l’URL di Apps Script.');return null;}
+  if(['add','update','delete'].includes(params.action)&&!sessionBackendReady){toast('Aggiorna Apps Script alla versione 8.7 e ricarica il tracker prima di salvare sessioni.');return null;}
+  if(params.action==='add'){params={...params,session:{...params.session,id:sessionDraftId(params.session)}};}
   const result=await trackerSync.request(params);
+  if(params.action==='add'&&result?.ok)clearSessionDraft(params.session.id);
   if(!result?.ok){const message=result?.error||'Collegamento a Google non riuscito';toast(message);setStatus(message,'err');}
   return result;
 }
@@ -2078,12 +2091,14 @@ function normalizeDate(d){
   return d.slice(0,10);
 }
 async function loadSessions(){
+  sessionBackendReady=false;
   if(!SCRIPT_URL)return;
   setStatus('Caricamento sessioni da Google…','wait');
   const data=await api({action:'getMain'});
   if(data&&data.ok){
     const versionBadge=document.getElementById('app-version-badge');
     const backendOk=versionAtLeast(data.backendVersion,REQUIRED_BACKEND_VERSION);
+    sessionBackendReady=backendOk;
     if(versionBadge){versionBadge.textContent=backendOk?'v'+TRACKER_VERSION:'v'+TRACKER_VERSION+' · Apps Script da aggiornare';versionBadge.title=backendOk?'Tracker e Apps Script aggiornati':'Serve Apps Script '+REQUIRED_BACKEND_VERSION+' o successivo';}
     if(!backendOk)toast('Tracker v'+TRACKER_VERSION+' attivo, ma Apps Script deve essere aggiornato alla versione '+REQUIRED_BACKEND_VERSION+' o successiva.');
     sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
@@ -2203,10 +2218,10 @@ async function restoreBackupFile(input){
   if(!confirm('Ripristinare questo backup?\n\nTask, note, Twitch, categorie, progetti e impostazioni locali verranno aggiornati. Le sessioni già presenti non saranno duplicate.'))return;
   if(window.importWorkDashboardBackup)await window.importWorkDashboardBackup(backup);
   const status=document.getElementById('backup-status');status.textContent='Ripristino in corso…';categories=Array.isArray(backup.categories)?backup.categories:[];projects=normProjects(Array.isArray(backup.projects)?backup.projects:[]);moods=backup.moods&&typeof backup.moods==='object'?backup.moods:{};localStorage.setItem('focus_categories',JSON.stringify(categories));localStorage.setItem('focus_projects',JSON.stringify(projects));localStorage.setItem('focus_moods',JSON.stringify(moods));
-  if(backup.settings){if(backup.settings.scriptUrl){SCRIPT_URL=backup.settings.scriptUrl;localStorage.setItem('focus_script_url',SCRIPT_URL);document.getElementById('script-url').value=SCRIPT_URL;}if(['pom','time','flow'].includes(backup.settings.currentMode))setMode(backup.settings.currentMode);if([0,5,10].includes(Number(backup.settings.tableLimit)))tableLimit=Number(backup.settings.tableLimit);}
+  if(backup.settings){if(backup.settings.scriptUrl){SCRIPT_URL=backup.settings.scriptUrl;sessionBackendReady=false;localStorage.setItem('focus_script_url',SCRIPT_URL);document.getElementById('script-url').value=SCRIPT_URL;}if(['pom','time','flow'].includes(backup.settings.currentMode))setMode(backup.settings.currentMode);if([0,5,10].includes(Number(backup.settings.tableLimit)))tableLimit=Number(backup.settings.tableLimit);}
   if(backup.timerState)localStorage.setItem(TIMER_KEY,JSON.stringify(backup.timerState));
   const imported=backup.sessions.map(s=>({...s,date:normalizeDate(s.date)})),signatures=new Set(sessions.map(sessionSignature)),missing=imported.filter(s=>!signatures.has(sessionSignature(s)));let added=0,failed=0;
-  if(SCRIPT_URL&&missing.length){setStatus('Ripristino sessioni…','wait');for(const s of missing){const payload={date:s.date,category:s.category||'',minutes:Number(s.minutes||0),pomodori:s.pomodori||'',durata_pomodoro:s.durata_pomodoro||'',note:s.note||'',mood:s.mood||'',projects:!s.projects?[]:(Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(x=>x.trim()).filter(Boolean)),task:s.task||'',taskId:s.taskId||''};const r=await api({action:'add',session:payload});if(r&&r.ok){sessions.push({...payload,id:r.id});added++;}else failed++;}}
+  if(SCRIPT_URL&&missing.length){setStatus('Ripristino sessioni…','wait');for(const s of missing){const payload={date:s.date,category:s.category||'',minutes:Number(s.minutes||0),pomodori:s.pomodori||'',durata_pomodoro:s.durata_pomodoro||'',note:s.note||'',mood:s.mood||'',projects:!s.projects?[]:(Array.isArray(s.projects)?s.projects:String(s.projects).split(',').map(x=>x.trim()).filter(Boolean)),task:s.task||'',taskId:s.taskId||''};const r=await api({action:'add',session:payload});if(r&&r.ok){if(!sessions.some(x=>String(x.id)===String(r.id)))sessions.push({...payload,id:r.id});added++;}else failed++;}}
   else if(!SCRIPT_URL){missing.forEach(s=>{sessions.push(s);added++;});}
   sessions.sort((a,b)=>a.date.localeCompare(b.date));saveCategories();saveProjects();renderCategories();renderProjects();refresh();if(backup.timerState){try{restoreTimer();}catch(err){}}if(SCRIPT_URL)setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');const msg='Ripristino completato: '+added+' session'+(added===1?'e aggiunta':'i aggiunte')+(failed?' · '+failed+' non importate':'')+'.';status.textContent=msg;toast(msg);
 }
@@ -2243,7 +2258,7 @@ async function addRow(){
   const data=await api({action:'add',session:{date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:sessionProjects,task,taskId}});
   btn.disabled=false;btn.textContent='+ aggiungi sessione';
   if(data&&data.ok){
-    sessions.push({id:data.id,date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:sessionProjects,task,taskId});
+    if(!sessions.some(s=>String(s.id)===String(data.id)))sessions.push({id:data.id,date,category,minutes,pomodori,durata_pomodoro,note,mood,projects:sessionProjects,task,taskId});
     sessions.sort((a,b)=>a.date.localeCompare(b.date));
     refresh();
     document.getElementById('inp-pomodori').value='';
@@ -2270,7 +2285,7 @@ async function removeRow(id){
   if(data&&data.ok){sessions=sessions.filter(s=>s.id.toString()!==id.toString());refresh();toast('Sessione rimossa.');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');}
 }
 
-function saveScriptUrl(){const val=document.getElementById('script-url').value.trim();if(!val.startsWith('https://script.google.com')){toast('URL non valido.');return;}SCRIPT_URL=val;localStorage.setItem('focus_script_url',val);loadSessions();}
+function saveScriptUrl(){const val=document.getElementById('script-url').value.trim();if(!val.startsWith('https://script.google.com')){toast('URL non valido.');return;}SCRIPT_URL=val;sessionBackendReady=false;localStorage.setItem('focus_script_url',val);loadSessions();}
 
 function exportCSV(){
   const filtered=getFiltered(viewYear,viewMonth);
@@ -2764,8 +2779,8 @@ html:before{content:'TRACKER_VERSION_9.6';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.6.1';
-const REQUIRED_BACKEND_VERSION='8.6';
+const TRACKER_VERSION='9.7.0';
+const REQUIRED_BACKEND_VERSION='8.7';
 const TRACKER_CACHE_MARK='v9-5-safe-sync';
 function versionAtLeast(current,required){
   const a=String(current||'0').split('.').map(n=>parseInt(n,10)||0),b=String(required||'0').split('.').map(n=>parseInt(n,10)||0),len=Math.max(a.length,b.length);
