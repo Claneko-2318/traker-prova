@@ -1211,7 +1211,7 @@ const trackerSync=(()=>{
   function install(){
     const panel=document.createElement('div');panel.style.cssText='padding:10px 16px;background:#f6eee3;color:#604c3e;border-bottom:1px solid #dfd0bf;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px';
     const detail=document.createElement('span');detail.id='sync-detail';detail.textContent=status;detail.style.flex='1';panel.append(detail);
-    for(const [label,fn] of [['Sincronizza',flush],['Verifica conflitti',review],['Scarica copia locale',download]]){const b=document.createElement('button');b.className='btn btn-sm';b.type='button';b.textContent=label;b.onclick=async()=>{b.disabled=true;const original=b.textContent;b.textContent='Attendi…';try{await fn();if(label==='Sincronizza')toast(status)}finally{b.disabled=false;b.textContent=original}};panel.append(b)}
+    for(const [label,fn] of [['Sincronizza',async()=>{await loadSessions();await sessionQueue.flush();await flush();}],['Verifica conflitti',review],['Scarica copia locale',download]]){const b=document.createElement('button');b.className='btn btn-sm';b.type='button';b.textContent=label;b.onclick=async()=>{b.disabled=true;const original=b.textContent;b.textContent='Attendi…';try{await fn();if(label==='Sincronizza')toast(status)}finally{b.disabled=false;b.textContent=original}};panel.append(b)}
     document.getElementById('config-panel').append(panel);
     const measures=document.createElement('div');measures.id='connection-measures';measures.style.cssText='white-space:pre-wrap;padding:10px 16px;font-size:12px;color:#604c3e';measures.textContent='Tempi di collegamento disponibili dopo la prima richiesta.';document.getElementById('config-panel').append(measures);showMeasures();if(!SCRIPT_URL)flush();
     let lastAutomatic=Date.now();
@@ -1224,18 +1224,61 @@ const trackerSync=(()=>{
   return {enqueue,flush,request,handles:action=>!!actionGroup[action],pending:()=>Object.values(context()).some(s=>s.pending),export:()=>copy(context())};
 })();
 let sessionBackendReady=false;
-function sessionDraftId(session){
-  const fingerprint=JSON.stringify(session);
-  const key='focus_pending_session_add_v1';
-  let pending;try{pending=JSON.parse(localStorage.getItem(key)||'null')}catch(e){}
-  if(pending&&pending.fingerprint===fingerprint)return pending.id;
-  const id=globalThis.crypto?.randomUUID?.()||'session-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-  localStorage.setItem(key,JSON.stringify({fingerprint,id}));return id;
-}
-function clearSessionDraft(id){
-  const key='focus_pending_session_add_v1';
-  try{if(JSON.parse(localStorage.getItem(key)||'null')?.id===id)localStorage.removeItem(key)}catch(e){}
-}
+// Durable additions: persist before acknowledging the form; retry the same ID.
+const sessionQueue = (()=>{
+  const key=()=> 'focus_session_outbox_v2:'+SCRIPT_URL;
+  let busy=null;
+  const recentBySource=new Map();
+  function recent(){if(!recentBySource.has(SCRIPT_URL))recentBySource.set(SCRIPT_URL,new Map());return recentBySource.get(SCRIPT_URL);}
+  function read(){const value=JSON.parse(localStorage.getItem(key())||'[]');if(!Array.isArray(value))throw new Error('Coda sessioni non valida');return value;}
+  function pending(id){return read().some(s=>id===undefined||String(s.id)===String(id));}
+  function add(session){
+    const id=globalThis.crypto?.randomUUID?.()||'session-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+    const item={...session,id},items=read();items.push(item);
+    localStorage.setItem(key(),JSON.stringify(items));
+    // Start after the caller has updated the UI.
+    setTimeout(flush,0);
+    return {ok:true,id,pending:true};
+  }
+  function merge(remote){
+    const all=new Map(remote.map(s=>[String(s.id),s]));
+    for(const [id,s] of recent()){if(all.has(id))recent().delete(id);else all.set(id,s);}
+    for(const s of read())all.set(String(s.id),s);
+    return [...all.values()].sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  function status(){
+    const count=read().length;
+    if(count)setStatus(count+' session'+(count===1?'e salvata':'i salvate')+' sul dispositivo · in attesa di Google','wait');
+    else if(sessionBackendReady)setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
+  }
+  async function send(){
+    if(!SCRIPT_URL||!sessionBackendReady||navigator.onLine===false){status();return;}
+    const url=SCRIPT_URL,storage=key();
+    while(url===SCRIPT_URL&&pending()){
+      const item=read()[0];
+      if(item._syncBlocked){setStatus('Sessione sul dispositivo · Apps Script ha restituito un ID diverso: verifica il codice prima di reinviare','err');return;}
+      const result=await trackerSync.request({action:'add',session:item});
+      if(url!==SCRIPT_URL)return;
+      if(result?.ok&&String(result.id)!==String(item.id)){
+        localStorage.setItem(storage,JSON.stringify(read().map(s=>String(s.id)===String(item.id)?{...s,_syncBlocked:true}:s)));
+        setStatus('Risposta Google incompatibile · invio sospeso per evitare doppioni. Verifica Apps Script.','err');return;
+      }
+      if(!result?.ok){
+        setStatus('Sessioni conservate sul dispositivo · '+(result?.error||'salvataggio Google non confermato')+' · nuovo tentativo automatico','wait');return;
+      }
+      // Cache already contains this row; keep it across in-flight stale reads too.
+      recent().set(String(item.id),item);
+      localStorage.setItem(storage,JSON.stringify(read().filter(s=>String(s.id)!==String(item.id))));
+    }
+    status();
+  }
+  function flush(){if(busy)return busy;busy=send().catch(()=>setStatus('Sessioni sul dispositivo · sincronizzazione da riprovare','wait')).finally(()=>{busy=null});return busy;}
+  function forget(id){recent().delete(String(id));}
+  window.addEventListener('online',()=>{if(sessionBackendReady)flush();else loadSessions();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(sessionBackendReady)flush();else if(SCRIPT_URL)loadSessions();}});
+  setInterval(()=>{if(document.visibilityState==='visible'&&SCRIPT_URL){if(sessionBackendReady)flush();else loadSessions();}},30000);
+  return {add,merge,pending,flush,status,forget};
+})();
 let sessions=[],moods={},chart=null;
 let selectedCatColor='#EAD9C0';
 let SCRIPT_URL=localStorage.getItem('focus_script_url')||'';
@@ -1614,6 +1657,7 @@ function renderChart(filtered){
   if(chart){chart.destroy();chart=null;}
   const canvas=document.getElementById('myChart');
   canvas.style.width='100%';canvas.style.height='250px';
+  if(typeof Chart==='undefined')return;
   chart=new Chart(canvas,{
     type:'line',
     data:{labels,datasets:[{label:'Minuti',data,borderColor:'#7A4E2D',backgroundColor:'rgba(122,78,45,0.07)',pointBackgroundColor:data.map(v=>v>0?'#4E2E14':'rgba(0,0,0,0)'),pointBorderColor:data.map(v=>v>0?'#fff':'rgba(0,0,0,0)'),pointBorderWidth:2,pointRadius:data.map(v=>v>0?5:2),pointHoverRadius:7,borderWidth:2,fill:true,tension:0}]},
@@ -1942,8 +1986,8 @@ async function saveTimerSession(){
     if(!sessions.some(s=>String(s.id)===String(add.id)))sessions.push(Object.assign({id:add.id},session));
     sessions.sort((a,b)=>a.date.localeCompare(b.date));
     refresh();closeTModal();resetTimer();
-    toast('Sessione salvata: '+toHours(p.tot)+'! 🎉');
-    setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
+    toast('Sessione salvata sul dispositivo: '+toHours(p.tot)+'! 🎉');
+    sessionQueue.status();
   } else toast('Errore di salvataggio — il timer resta attivo, riprova.');
 }
 (function restoreTimerLater(){
@@ -2067,10 +2111,11 @@ async function saveEdit(){
 async function api(params){
   if(trackerSync.handles(params.action))return trackerSync.enqueue(params);
   if(!SCRIPT_URL){toast('Configura prima l’URL di Apps Script.');return null;}
-  if(['add','update','delete'].includes(params.action)&&!sessionBackendReady){toast('Aggiorna Apps Script alla versione 8.7 e ricarica il tracker prima di salvare sessioni.');return null;}
-  if(params.action==='add'){params={...params,session:{...params.session,id:sessionDraftId(params.session)}};}
+  if(params.action==='add'){try{return sessionQueue.add(params.session)}catch(e){toast('Impossibile conservare la sessione sul dispositivo: '+e.message);return {ok:false};}}
+  if(['update','delete'].includes(params.action)&&sessionQueue.pending(params.id)){toast('Attendi la conferma Google prima di modificare o eliminare questa sessione.');return {ok:false};}
+  if(['update','delete'].includes(params.action)&&!sessionBackendReady){toast('Aggiorna Apps Script alla versione 8.7 e ricarica il tracker prima di salvare sessioni.');return null;}
   const result=await trackerSync.request(params);
-  if(params.action==='add'&&result?.ok)clearSessionDraft(params.session.id);
+  if(['update','delete'].includes(params.action)&&result?.ok)sessionQueue.forget(params.id);
   if(!result?.ok){const message=result?.error||'Collegamento a Google non riuscito';toast(message);setStatus(message,'err');}
   return result;
 }
@@ -2090,18 +2135,25 @@ function normalizeDate(d){
     return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
   return d.slice(0,10);
 }
-async function loadSessions(){
-  sessionBackendReady=false;
+let sessionLoad=null;
+function loadSessions(){
+  if(sessionLoad)return sessionLoad;
+  sessionLoad=loadSessionsOnce().finally(()=>{sessionLoad=null});return sessionLoad;
+}
+async function loadSessionsOnce(){
+  const sourceUrl=SCRIPT_URL;
   if(!SCRIPT_URL)return;
   setStatus('Caricamento sessioni da Google…','wait');
   const data=await api({action:'getMain'});
+  if(sourceUrl!==SCRIPT_URL)return;
   if(data&&data.ok){
+    if(!Array.isArray(data.sessions)){setStatus('Risposta Google incompleta · dati locali conservati','err');return;}
     const versionBadge=document.getElementById('app-version-badge');
     const backendOk=versionAtLeast(data.backendVersion,REQUIRED_BACKEND_VERSION);
     sessionBackendReady=backendOk;
     if(versionBadge){versionBadge.textContent=backendOk?'v'+TRACKER_VERSION:'v'+TRACKER_VERSION+' · Apps Script da aggiornare';versionBadge.title=backendOk?'Tracker e Apps Script aggiornati':'Serve Apps Script '+REQUIRED_BACKEND_VERSION+' o successivo';}
     if(!backendOk)toast('Tracker v'+TRACKER_VERSION+' attivo, ma Apps Script deve essere aggiornato alla versione '+REQUIRED_BACKEND_VERSION+' o successiva.');
-    sessions=(data.sessions||[]).map(s=>({...s,date:normalizeDate(s.date)})).sort((a,b)=>a.date.localeCompare(b.date));
+    sessions=sessionQueue.merge(data.sessions.map(s=>({...s,date:normalizeDate(s.date)})));
     // categorie
     // progetti
     if(data.projects&&data.projects.length>0){
@@ -2146,7 +2198,7 @@ async function loadSessions(){
     refresh();
     setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
     document.getElementById('config-panel').classList.add('hidden');
-    trackerSync.flush();
+    sessionQueue.status();sessionQueue.flush();trackerSync.flush();
   }else if(data){setStatus('Errore: '+(data.error||'risposta non valida'),'err');}
 }
 
@@ -2273,7 +2325,7 @@ async function addRow(){
     document.getElementById('preview-flow').innerHTML='';
     document.querySelectorAll('.mood-btn[data-mood]').forEach(b=>b.classList.remove('selected'));
     renderProjSelector('inp-proj-chips');
-    toast('Sessione salvata!');setStatus('Connesso — '+sessions.length+' sessioni caricate','ok');
+    toast('Sessione salvata sul dispositivo · invio a Google in corso');sessionQueue.status();
   }
 }
 
@@ -2414,7 +2466,7 @@ function exportPDF(){
 window.addEventListener('resize',()=>{if(chart)chart.resize();});
 document.getElementById('inp-date').value=todayStr;
 // Carica da localStorage come fallback immediato
-try{sessions=JSON.parse(localStorage.getItem('focus_sessions_cache')||'[]');if(!Array.isArray(sessions))sessions=[];}catch(err){sessions=[];}
+try{sessions=JSON.parse(localStorage.getItem('focus_sessions_cache')||'[]');if(!Array.isArray(sessions))sessions=[];sessions=sessionQueue.merge(sessions);}catch(err){sessions=[];}
 categories=JSON.parse(localStorage.getItem('focus_categories')||'[]');
 projects=normProjects(JSON.parse(localStorage.getItem('focus_projects')||'[]'));
 const rawInit=JSON.parse(localStorage.getItem('focus_moods')||'{}');
@@ -2779,7 +2831,7 @@ html:before{content:'TRACKER_VERSION_9.6';display:none}
 })();
 </script>
 <script>
-const TRACKER_VERSION='9.7.0';
+const TRACKER_VERSION='9.7.1';
 const REQUIRED_BACKEND_VERSION='8.7';
 const TRACKER_CACHE_MARK='v9-5-safe-sync';
 function versionAtLeast(current,required){

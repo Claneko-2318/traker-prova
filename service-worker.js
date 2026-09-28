@@ -1,4 +1,4 @@
-const CACHE_NAME = "tracker-lavoro-cafe-v9-7-session-safe";
+const CACHE_NAME = "tracker-lavoro-cafe-v9-7-1-session-outbox";
 const APP_SHELL = [
   "./working-tracker.html",
   "./kurorei-chill.png",
